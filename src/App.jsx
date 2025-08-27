@@ -1,9 +1,13 @@
 // src/App.jsx
 import React, { useMemo, useState } from "react";
-import { Connection, Transaction, SystemProgram } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
-
-import idl from "./idl/dmd_anchor.json"; // nur für den Ix-Coder (instructions), NICHT für Program()
+import {
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+  Connection,
+} from "@solana/web3.js";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -21,30 +25,96 @@ import {
 } from "@solana/wallet-adapter-wallets";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
+import idl from "./idl/dmd_anchor.json";               // dein IDL (für Coder)  ⟶ buy_dmd/claim_reward/sell_dmd vorhanden
+//                                                                         ↑ siehe dmd_anchor.json instructions. 
+//                                                                         (buy_dmd-Accounts-Reihenfolge!) :contentReference[oaicite:3]{index=3}
 import {
-  PROGRAM_ID,
-  DMD_MINT,
-  TREASURY,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
   TOKEN_PROGRAM_ID,
-  findVaultPda,
-  findBuyerStatePda,
-  vaultAta,
-  buyerAta,
-  buildIxCoder,
-  ix_fromCoder,
-} from "./solana";
+} from "@solana/spl-token";
 
-// === RPC ===
+// ======== PROJEKT-KONSTANTEN ========
+// Program ID aus deinem IDL:
+const PROGRAM_ID = new PublicKey("EDY4bp4fXWkAJpJhXUMZLL7fjpDhpKZQFPpygzsTMzro"); // :contentReference[oaicite:4]{index=4}
+
+// Mint / Treasury / Founder:
+const DMD_MINT = new PublicKey("3W8wtdW8pA8eUfUMJrCnJh9Dto8rc23nfQRJamuh1AWb"); // falls abweichend, anpassen
+const TREASURY_PUBKEY = new PublicKey("CEUmazdgtbUCcQyLq6NCm4BuQbvCsYFzKsS5wdRvZehV"); // anpassen falls anders
+const FOUNDER_PUBKEY  = new PublicKey("AqPFb5LWQuzKiyoKTX9XgUwsYWoFvpeE8E8uzQvnDTzT"); // anpassen falls anders
+
 const RPC_URL = "https://mainnet.helius-rpc.com/?api-key=cba27cb3-9d36-4095-ae3a-4025bc7ff611";
 
+// ======== PDA-Helper (aus IDL abgeleitet) ========
+// vault = PDA([b"vault"])
+function findVaultPda() {
+  return PublicKey.findProgramAddressSync([Buffer.from("vault")], PROGRAM_ID)[0];
+}
+// buyer_state = PDA([b"buyer", vault, buyer])
+function findBuyerStatePda(vault, buyer) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("buyer"), vault.toBuffer(), buyer.toBuffer()],
+    PROGRAM_ID
+  )[0];
+}
+
+// ATA-Helper (Owner kann PDA sein ⇒ allowOwnerOffCurve=true)
+async function ataOf(owner) {
+  return await getAssociatedTokenAddress(DMD_MINT, owner, true);
+}
+
+// ======== Instruction-Builder via Anchor Coder ========
+const coder = new anchor.BorshInstructionCoder(idl); // :contentReference[oaicite:5]{index=5}
+function ixFromCoder(name, keys, args = {}) {
+  const data = coder.encode(name, args);
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys,
+    data,
+  });
+}
+
+// ======== UI-Komponente ========
 function UI() {
   const wallet = useWallet();
   const [connection] = useState(() => new Connection(RPC_URL, "confirmed"));
-  const [ixCoder] = useState(() => buildIxCoder(idl)); // nur instructions nötig
+  const [amountSol, setAmountSol] = useState("1.0");
   const [status, setStatus] = useState("");
-  const [amountSol, setAmountSol] = useState("1.0"); // SOL (Buy) / DMD (Sell)
 
   const connected = !!wallet.publicKey;
+
+  async function ensureAtas(payer, buyer, vault) {
+    const ixs = [];
+    const buyerAta = await ataOf(buyer);
+    const vaultAta = await ataOf(vault);
+
+    const [buyerInfo, vaultInfo] = await Promise.all([
+      connection.getAccountInfo(buyerAta),
+      connection.getAccountInfo(vaultAta),
+    ]);
+
+    if (!buyerInfo) {
+      ixs.push(
+        createAssociatedTokenAccountInstruction(
+          payer,     // payer zahlt Miete
+          buyerAta,  // neue ATA
+          buyer,     // owner
+          DMD_MINT   // mint
+        )
+      );
+    }
+    if (!vaultInfo) {
+      ixs.push(
+        createAssociatedTokenAccountInstruction(
+          payer,
+          vaultAta,
+          vault,     // owner = PDA
+          DMD_MINT
+        )
+      );
+    }
+    return { ixs, buyerAta, vaultAta };
+  }
 
   async function handleBuy() {
     try {
@@ -55,67 +125,34 @@ function UI() {
       const vault = findVaultPda();
       const buyerState = findBuyerStatePda(vault, buyer);
 
-      // ATAs
-      const buyerToken = await buyerAta(buyer);
-      const vaultToken = await vaultAta(vault);
+      const { ixs: ataIxs, buyerAta, vaultAta } = await ensureAtas(buyer, buyer, vault);
 
-      // ATAs ggf. anlegen
-      const ataIxs = [];
-      const { createAssociatedTokenAccountInstruction } = await import("@solana/spl-token");
-
-      const [buyerInfo, vaultInfo] = await Promise.all([
-        connection.getAccountInfo(buyerToken),
-        connection.getAccountInfo(vaultToken),
-      ]);
-      if (!buyerInfo) {
-        ataIxs.push(
-          createAssociatedTokenAccountInstruction(
-            buyer,        // payer
-            buyerToken,   // ata
-            buyer,        // owner
-            DMD_MINT      // mint
-          )
-        );
-      }
-      if (!vaultInfo) {
-        ataIxs.push(
-          createAssociatedTokenAccountInstruction(
-            buyer,        // payer
-            vaultToken,   // ata
-            vault,        // owner (PDA)
-            DMD_MINT
-          )
-        );
-      }
-
-      // Betrag in Lamports
+      // Betrag (SOL → Lamports)
       const lamports = new anchor.BN(
         Math.floor(parseFloat(amountSol) * anchor.web3.LAMPORTS_PER_SOL)
       );
       if (lamports.lte(new anchor.BN(0))) return alert("Ungültiger SOL-Betrag.");
 
-      // buy_dmd – via IDL Instruction-Coder
+      // 🔴 WICHTIG: Accounts exakt wie im IDL angeben (Founder ≠ Buyer!) :contentReference[oaicite:6]{index=6}
       const keys = [
-        { pubkey: vault,               isSigner: false, isWritable: true },
-        { pubkey: buyerState,          isSigner: false, isWritable: true },
-        { pubkey: buyer,               isSigner: false, isWritable: true },
-        { pubkey: TREASURY,            isSigner: false, isWritable: true },
-        { pubkey: vaultToken,          isSigner: false, isWritable: true },
-        { pubkey: buyerToken,          isSigner: false, isWritable: true },
-        { pubkey: buyer,               isSigner: true,  isWritable: true },
-        { pubkey: TOKEN_PROGRAM_ID,    isSigner: false, isWritable: false },
+        { pubkey: vault,          isSigner: false, isWritable: true },
+        { pubkey: buyerState,     isSigner: false, isWritable: true },
+        { pubkey: FOUNDER_PUBKEY, isSigner: false, isWritable: true }, // <-- vorher fälschlich buyer
+        { pubkey: TREASURY_PUBKEY,isSigner: false, isWritable: true },
+        { pubkey: vaultAta,       isSigner: false, isWritable: true }, // vault_token_account
+        { pubkey: buyerAta,       isSigner: false, isWritable: true }, // buyer_token_account
+        { pubkey: buyer,          isSigner: true,  isWritable: true }, // buyer (signer)
+        { pubkey: TOKEN_PROGRAM_ID,isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ];
-      const buyIx = ix_fromCoder(ixCoder, "buy_dmd", keys, { sol_contribution: lamports });
+
+      const buyIx = ixFromCoder("buy_dmd", keys, { sol_contribution: lamports }); // :contentReference[oaicite:7]{index=7}
 
       const tx = new Transaction();
-      ataIxs.forEach(ix => ix && tx.add(ix));
+      ataIxs.forEach(ix => tx.add(ix));
       tx.add(buyIx);
-
-      // Tx-Header
       tx.feePayer = buyer;
-      const { blockhash } = await connection.getLatestBlockhash();
-      tx.recentBlockhash = blockhash;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       setStatus("Sende Buy…");
       const sig = await wallet.sendTransaction(tx, connection);
@@ -135,8 +172,7 @@ function UI() {
       const vault = findVaultPda();
       const buyerState = findBuyerStatePda(vault, buyer);
 
-      // amountSol hier als DMD (9 Decimals)
-      const amount = new anchor.BN(Math.floor(parseFloat(amountSol) * 1e9));
+      const amount = new anchor.BN(Math.floor(parseFloat(amountSol) * 1e9)); // DMD (9 Decimals)
       if (amount.lte(new anchor.BN(0))) return alert("Ungültiger DMD-Betrag.");
 
       const keys = [
@@ -144,12 +180,11 @@ function UI() {
         { pubkey: buyerState, isSigner: false, isWritable: true },
         { pubkey: buyer,      isSigner: true,  isWritable: true },
       ];
-      const sellIx = ix_fromCoder(ixCoder, "sell_dmd", keys, { amount });
+      const sellIx = ixFromCoder("sell_dmd", keys, { amount }); // :contentReference[oaicite:8]{index=8}
 
       const tx = new Transaction().add(sellIx);
       tx.feePayer = buyer;
-      const { blockhash } = await connection.getLatestBlockhash();
-      tx.recentBlockhash = blockhash;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       setStatus("Sende Sell…");
       const sig = await wallet.sendTransaction(tx, connection);
@@ -163,7 +198,7 @@ function UI() {
   async function handleClaim() {
     try {
       if (!connected) return alert("Verbinde deine Wallet.");
-      setStatus("Prüfe Claim…");
+      setStatus("Bereite Claim vor…");
 
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
@@ -174,12 +209,11 @@ function UI() {
         { pubkey: buyerState, isSigner: false, isWritable: true },
         { pubkey: buyer,      isSigner: true,  isWritable: false },
       ];
-      const claimIx = ix_fromCoder(ixCoder, "claim_reward", keys);
+      const claimIx = ixFromCoder("claim_reward", keys); // :contentReference[oaicite:9]{index=9}
 
       const tx = new Transaction().add(claimIx);
       tx.feePayer = buyer;
-      const { blockhash } = await connection.getLatestBlockhash();
-      tx.recentBlockhash = blockhash;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       setStatus("Sende Claim…");
       const sig = await wallet.sendTransaction(tx, connection);
@@ -192,7 +226,6 @@ function UI() {
 
   return (
     <div className="min-h-screen bg-[#0b0f14] text-yellow-300">
-      {/* Connect-Button */}
       <div style={{ position: "fixed", top: 16, right: 16, zIndex: 50 }}>
         <WalletMultiButton />
       </div>
@@ -211,9 +244,7 @@ function UI() {
 
       <main className="max-w-5xl mx-auto px-4 py-10">
         {!connected ? (
-          <div className="text-white/70">
-            Verbinde zuerst deine Wallet (oben rechts).
-          </div>
+          <div className="text-white/70">Verbinde zuerst deine Wallet (oben rechts).</div>
         ) : (
           <>
             <div className="mb-6">
@@ -245,26 +276,19 @@ function UI() {
       </main>
 
       <footer className="text-center text-white/40 text-sm py-6">
-        © 2025 Die Mark Digital · Buy • Sell • Claim
+        © {new Date().getFullYear()} Die Mark Digital · Buy • Sell • Claim
       </footer>
     </div>
   );
 }
 
 export default function App() {
-  const endpoint = RPC_URL;
   const wallets = useMemo(
-    () => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-      new LedgerWalletAdapter(),
-      new TorusWalletAdapter(),
-    ],
+    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter(), new LedgerWalletAdapter(), new TorusWalletAdapter()],
     []
   );
-
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider endpoint={RPC_URL}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
           <UI />
