@@ -1,6 +1,6 @@
 // src/App.jsx
 import React, { useMemo, useState } from "react";
-import { Connection, PublicKey, Transaction, SystemProgram } from "@solana/web3.js";
+import { Connection, Transaction, SystemProgram } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 
 import idl from "./idl/dmd_anchor.json"; // nur für den Ix-Coder (instructions), NICHT für Program()
@@ -55,8 +55,9 @@ function UI() {
       const vault = findVaultPda();
       const buyerState = findBuyerStatePda(vault, buyer);
 
-      const buyerToken = buyerAta(buyer);
-      const vaultToken = vaultAta(vault);
+      // ATAs
+      const buyerToken = await buyerAta(buyer);
+      const vaultToken = await vaultAta(vault);
 
       // ATAs ggf. anlegen
       const ataIxs = [];
@@ -93,11 +94,11 @@ function UI() {
       );
       if (lamports.lte(new anchor.BN(0))) return alert("Ungültiger SOL-Betrag.");
 
-      // buy_dmd – reiner Ix-Encoder via IDL.instructions
+      // buy_dmd – via IDL Instruction-Coder
       const keys = [
         { pubkey: vault,               isSigner: false, isWritable: true },
         { pubkey: buyerState,          isSigner: false, isWritable: true },
-        { pubkey: buyer,               isSigner: false, isWritable: true }, // founder SystemAccount wird on-chain geprüft, buyer als Platzhalter ok
+        { pubkey: buyer,               isSigner: false, isWritable: true },
         { pubkey: TREASURY,            isSigner: false, isWritable: true },
         { pubkey: vaultToken,          isSigner: false, isWritable: true },
         { pubkey: buyerToken,          isSigner: false, isWritable: true },
@@ -111,12 +112,17 @@ function UI() {
       ataIxs.forEach(ix => ix && tx.add(ix));
       tx.add(buyIx);
 
+      // Tx-Header
+      tx.feePayer = buyer;
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+
       setStatus("Sende Buy…");
       const sig = await wallet.sendTransaction(tx, connection);
       setStatus(`✅ Buy gesendet: ${sig}`);
     } catch (e) {
       console.error(e);
-      setStatus(`❌ Buy fehlgeschlagen: ${e.message ?? e}`);
+      setStatus(`❌ Buy fehlgeschlagen: ${e?.message ?? e}`);
     }
   }
 
@@ -141,12 +147,16 @@ function UI() {
       const sellIx = ix_fromCoder(ixCoder, "sell_dmd", keys, { amount });
 
       const tx = new Transaction().add(sellIx);
+      tx.feePayer = buyer;
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+
       setStatus("Sende Sell…");
       const sig = await wallet.sendTransaction(tx, connection);
       setStatus(`✅ Sell gesendet: ${sig}`);
     } catch (e) {
       console.error(e);
-      setStatus(`❌ Sell fehlgeschlagen: ${e.message ?? e}`);
+      setStatus(`❌ Sell fehlgeschlagen: ${e?.message ?? e}`);
     }
   }
 
@@ -167,18 +177,22 @@ function UI() {
       const claimIx = ix_fromCoder(ixCoder, "claim_reward", keys);
 
       const tx = new Transaction().add(claimIx);
+      tx.feePayer = buyer;
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+
       setStatus("Sende Claim…");
       const sig = await wallet.sendTransaction(tx, connection);
       setStatus(`✅ Claim gesendet: ${sig}`);
     } catch (e) {
       console.error(e);
-      setStatus(`❌ Claim fehlgeschlagen: ${e.message ?? e}`);
+      setStatus(`❌ Claim fehlgeschlagen: ${e?.message ?? e}`);
     }
   }
 
   return (
     <div className="min-h-screen bg-[#0b0f14] text-yellow-300">
-      {/* Connect-Button fix */}
+      {/* Connect-Button */}
       <div style={{ position: "fixed", top: 16, right: 16, zIndex: 50 }}>
         <WalletMultiButton />
       </div>
