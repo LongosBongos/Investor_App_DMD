@@ -4,6 +4,7 @@ import * as anchor from "@coral-xyz/anchor";
 import {
   PublicKey,
   SystemProgram,
+  SYSVAR_RENT_PUBKEY,
   Transaction,
   TransactionInstruction,
   Connection,
@@ -25,27 +26,20 @@ import {
 } from "@solana/wallet-adapter-wallets";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-import idl from "./idl/dmd_anchor.json";               // dein IDL (für Coder)  ⟶ buy_dmd/claim_reward/sell_dmd vorhanden
-//                                                                         ↑ siehe dmd_anchor.json instructions. 
-//                                                                         (buy_dmd-Accounts-Reihenfolge!) :contentReference[oaicite:3]{index=3}
-import {
-  getAssociatedTokenAddress,
-  createAssociatedTokenAccountInstruction,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
+import idl from "./idl/dmd_anchor.json";
 
-// ======== PROJEKT-KONSTANTEN ========
-// Program ID aus deinem IDL:
-const PROGRAM_ID = new PublicKey("EDY4bp4fXWkAJpJhXUMZLL7fjpDhpKZQFPpygzsTMzro"); // :contentReference[oaicite:4]{index=4}
-
-// Mint / Treasury / Founder:
-const DMD_MINT = new PublicKey("3W8wtdW8pA8eUfUMJrCnJh9Dto8rc23nfQRJamuh1AWb"); // falls abweichend, anpassen
-const TREASURY_PUBKEY = new PublicKey("CEUmazdgtbUCcQyLq6NCm4BuQbvCsYFzKsS5wdRvZehV"); // anpassen falls anders
-const FOUNDER_PUBKEY  = new PublicKey("AqPFb5LWQuzKiyoKTX9XgUwsYWoFvpeE8E8uzQvnDTzT"); // anpassen falls anders
-
+// ======== PROJEKT-KONSTANTEN (aus deinem Master-Client) ========
+const PROGRAM_ID = new PublicKey("EDY4bp4fXWkAJpJhXUMZLL7fjpDhpKZQFPpygzsTMzro");
 const RPC_URL = "https://mainnet.helius-rpc.com/?api-key=cba27cb3-9d36-4095-ae3a-4025bc7ff611";
+const DMD_MINT = new PublicKey("3rCZT3Xw6jvU4JWatQPsivS8fQ7gV7GjUfJnbTk9Ssn5");               // ✅ richtiger Mint
+const TREASURY_PUBKEY = new PublicKey("CEUmazdgtbUCcQyLq6NCm4BuQbvCsYFzKsS5wdRvZehV");         // ✅ richtige Treasury
+const FOUNDER_PUBKEY  = new PublicKey("AqPFb5LWQuzKiyoKTX9XgUwsYWoFvpeE8E8uzQvnDTzT");         // Founder
 
-// ======== PDA-Helper (aus IDL abgeleitet) ========
+// SPL Program IDs (hart hinterlegt – kein spl-token Import nötig)
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+// ======== PDA-Helper ========
 // vault = PDA([b"vault"])
 function findVaultPda() {
   return PublicKey.findProgramAddressSync([Buffer.from("vault")], PROGRAM_ID)[0];
@@ -58,13 +52,33 @@ function findBuyerStatePda(vault, buyer) {
   )[0];
 }
 
-// ATA-Helper (Owner kann PDA sein ⇒ allowOwnerOffCurve=true)
-async function ataOf(owner) {
-  return await getAssociatedTokenAddress(DMD_MINT, owner, true);
+// ATA-Adresse (ohne spl-token helper)
+function ataOf(owner) {
+  return PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  )[0];
+}
+
+// Create ATA Instruction (manuell gebaut)
+function createAtaIx(payer, ata, owner, mint) {
+  return new TransactionInstruction({
+    programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer,               isSigner: true,  isWritable: true  }, // payer
+      { pubkey: ata,                 isSigner: false, isWritable: true  }, // ata
+      { pubkey: owner,               isSigner: false, isWritable: false }, // owner
+      { pubkey: mint,                isSigner: false, isWritable: false }, // mint
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system
+      { pubkey: TOKEN_PROGRAM_ID,    isSigner: false, isWritable: false }, // token program
+      { pubkey: SYSVAR_RENT_PUBKEY,  isSigner: false, isWritable: false }, // rent (kompatibel)
+    ],
+    data: Buffer.alloc(0),
+  });
 }
 
 // ======== Instruction-Builder via Anchor Coder ========
-const coder = new anchor.BorshInstructionCoder(idl); // :contentReference[oaicite:5]{index=5}
+const coder = new anchor.BorshInstructionCoder(idl);
 function ixFromCoder(name, keys, args = {}) {
   const data = coder.encode(name, args);
   return new TransactionInstruction({
@@ -85,34 +99,17 @@ function UI() {
 
   async function ensureAtas(payer, buyer, vault) {
     const ixs = [];
-    const buyerAta = await ataOf(buyer);
-    const vaultAta = await ataOf(vault);
+    const buyerAta = ataOf(buyer);
+    const vaultAta = ataOf(vault);
 
     const [buyerInfo, vaultInfo] = await Promise.all([
       connection.getAccountInfo(buyerAta),
       connection.getAccountInfo(vaultAta),
     ]);
 
-    if (!buyerInfo) {
-      ixs.push(
-        createAssociatedTokenAccountInstruction(
-          payer,     // payer zahlt Miete
-          buyerAta,  // neue ATA
-          buyer,     // owner
-          DMD_MINT   // mint
-        )
-      );
-    }
-    if (!vaultInfo) {
-      ixs.push(
-        createAssociatedTokenAccountInstruction(
-          payer,
-          vaultAta,
-          vault,     // owner = PDA
-          DMD_MINT
-        )
-      );
-    }
+    if (!buyerInfo) ixs.push(createAtaIx(payer, buyerAta, buyer, DMD_MINT));
+    if (!vaultInfo) ixs.push(createAtaIx(payer, vaultAta, vault, DMD_MINT));
+
     return { ixs, buyerAta, vaultAta };
   }
 
@@ -127,26 +124,26 @@ function UI() {
 
       const { ixs: ataIxs, buyerAta, vaultAta } = await ensureAtas(buyer, buyer, vault);
 
-      // Betrag (SOL → Lamports)
+      // SOL → Lamports
       const lamports = new anchor.BN(
         Math.floor(parseFloat(amountSol) * anchor.web3.LAMPORTS_PER_SOL)
       );
       if (lamports.lte(new anchor.BN(0))) return alert("Ungültiger SOL-Betrag.");
 
-      // 🔴 WICHTIG: Accounts exakt wie im IDL angeben (Founder ≠ Buyer!) :contentReference[oaicite:6]{index=6}
+      // buy_dmd(vault, buyer_state, founder, treasury, vault_token_account, buyer_token_account, buyer, token_program, system_program)
       const keys = [
-        { pubkey: vault,          isSigner: false, isWritable: true },
-        { pubkey: buyerState,     isSigner: false, isWritable: true },
-        { pubkey: FOUNDER_PUBKEY, isSigner: false, isWritable: true }, // <-- vorher fälschlich buyer
-        { pubkey: TREASURY_PUBKEY,isSigner: false, isWritable: true },
-        { pubkey: vaultAta,       isSigner: false, isWritable: true }, // vault_token_account
-        { pubkey: buyerAta,       isSigner: false, isWritable: true }, // buyer_token_account
-        { pubkey: buyer,          isSigner: true,  isWritable: true }, // buyer (signer)
-        { pubkey: TOKEN_PROGRAM_ID,isSigner: false, isWritable: false },
+        { pubkey: vault,            isSigner: false, isWritable: true },
+        { pubkey: buyerState,       isSigner: false, isWritable: true },
+        { pubkey: FOUNDER_PUBKEY,   isSigner: false, isWritable: true },
+        { pubkey: TREASURY_PUBKEY,  isSigner: false, isWritable: true },
+        { pubkey: vaultAta,         isSigner: false, isWritable: true },
+        { pubkey: buyerAta,         isSigner: false, isWritable: true },
+        { pubkey: buyer,            isSigner: true,  isWritable: true },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ];
 
-      const buyIx = ixFromCoder("buy_dmd", keys, { sol_contribution: lamports }); // :contentReference[oaicite:7]{index=7}
+      const buyIx = ixFromCoder("buy_dmd", keys, { sol_contribution: lamports });
 
       const tx = new Transaction();
       ataIxs.forEach(ix => tx.add(ix));
@@ -175,12 +172,13 @@ function UI() {
       const amount = new anchor.BN(Math.floor(parseFloat(amountSol) * 1e9)); // DMD (9 Decimals)
       if (amount.lte(new anchor.BN(0))) return alert("Ungültiger DMD-Betrag.");
 
+      // sell_dmd(vault, buyer_state, buyer)
       const keys = [
         { pubkey: vault,      isSigner: false, isWritable: true },
         { pubkey: buyerState, isSigner: false, isWritable: true },
         { pubkey: buyer,      isSigner: true,  isWritable: true },
       ];
-      const sellIx = ixFromCoder("sell_dmd", keys, { amount }); // :contentReference[oaicite:8]{index=8}
+      const sellIx = ixFromCoder("sell_dmd", keys, { amount });
 
       const tx = new Transaction().add(sellIx);
       tx.feePayer = buyer;
@@ -204,12 +202,13 @@ function UI() {
       const vault = findVaultPda();
       const buyerState = findBuyerStatePda(vault, buyer);
 
+      // claim_reward(vault, buyer_state, buyer)
       const keys = [
         { pubkey: vault,      isSigner: false, isWritable: true },
         { pubkey: buyerState, isSigner: false, isWritable: true },
         { pubkey: buyer,      isSigner: true,  isWritable: false },
       ];
-      const claimIx = ixFromCoder("claim_reward", keys); // :contentReference[oaicite:9]{index=9}
+      const claimIx = ixFromCoder("claim_reward", keys);
 
       const tx = new Transaction().add(claimIx);
       tx.feePayer = buyer;
@@ -297,3 +296,4 @@ export default function App() {
     </ConnectionProvider>
   );
 }
+
