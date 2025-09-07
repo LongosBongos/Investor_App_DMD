@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0f14" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="description" content="Die Mark Digital — Investor App (Solana)" />
+
+    <!-- Social cards -->
+    <meta property="og:title" content="Die Mark Digital — Investor App" />
+    <meta property="og:description" content="Buy • Sell • Claim — sicher über deinen Wallet-Adapter." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og.png" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- Fonts: Blackletter für Logo + klare UI-Schrift -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet" />
+
+    <title>Die Mark Digital — Investor App</title>
+
+    <!-- Minimal Global Styles (du kannst später in /src/index.css auslagern) -->
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --panel: #11161d;
+        --panel-2: #161c24;
+        --text: #e6edf3;
+        --muted: #aab2bd;
+        --gold: #d4af37;
+        --accent: #14f195; /* Solana grün */
+        --radius: 14px;
+        --shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.02);
+      }
+      * { box-sizing: border-box; }
+      html, body, #root { height: 100%; }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1200px 800px at 80% -10%, #12202f 0%, rgba(18,32,47,0) 60%),
+          radial-gradient(1000px 600px at -10% 120%, #1c2230 0%, rgba(28,34,48,0) 60%),
+          var(--bg);
+      }
+      .app-shell {
+        min-height: 100%;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+      header {
+        position: sticky; top: 0; z-index: 20;
+        backdrop-filter: blur(8px);
+        background: rgba(11,15,20,.6);
+        border-bottom: 1px solid rgba(255,255,255,.06);
+      }
+      .container {
+        max-width: 1100px; margin: 0 auto; padding: 14px 18px;
+      }
+      .brand {
+        display: flex; align-items: baseline; gap: 12px;
+      }
+      .brand__mark {
+        font-family: "UnifrakturCook", serif;
+        font-size: clamp(20px, 2.2vw + 14px, 32px);
+        letter-spacing: .5px;
+        color: var(--gold);
+        text-shadow: 0 0 22px rgba(212,175,55,.25);
+        user-select: none;
+      }
+      .brand__sub { color: var(--muted); font-size: 13px; }
+      main { padding: 24px 18px; }
+      footer {
+        border-top: 1px solid rgba(255,255,255,.06);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      /* Noscript Hinweis */
+      .noscript {
+        margin: 18px auto;
+        max-width: 900px;
+        background: var(--panel);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        box-shadow: var(--shadow);
+        color: #ffb4b4;
+      }
+    </style>
+    <script type="module" crossorigin src="/Investor_App_DMD/assets/index-bsDZN0Vj.js"></script>
+    <link rel="stylesheet" crossorigin href="/Investor_App_DMD/assets/index-C9MLiMzt.css">
+  </head>
+
+  <body>
+    <div class="app-shell">
+      <header>
+        <div class="container">
+          <div class="brand">
+            <div class="brand__mark">Die Mark Digital</div>
+            <div class="brand__sub">Investor&nbsp;App · Solana</div>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <noscript>
+          <div class="noscript">
+            Diese App benötigt JavaScript (Wallet-Connect, Transaktionen, etc.). Bitte aktivieren.
+          </div>
+        </noscript>
+        <div id="root"></div>
+      </main>
+
+      <footer>
+        <div class="container">
+          © <span id="y"></span> Die Mark Digital · Buy • Sell • Claim
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      // Jahr im Footer setzen, minimale UX
+      document.getElementById('y')?.append(new Date().getFullYear());
+    </script>
+
+    <!-- Vite entry -->
+  </body>
+</html>
+
