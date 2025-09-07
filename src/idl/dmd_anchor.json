@@ -171,6 +171,82 @@
       "args": []
     },
     {
+      "name": "claim_reward_v2",
+      "discriminator": [
+        0,
+        178,
+        84,
+        58,
+        172,
+        64,
+        185,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "buyer_token_account",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize",
       "discriminator": [
         175,
@@ -321,6 +397,149 @@
       "args": [
         {
           "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "sell_dmd_v2",
+      "discriminator": [
+        84,
+        193,
+        171,
+        169,
+        74,
+        251,
+        221,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "buyer_token_account",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury zahlt SOL aus (Signer!)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "founder",
+          "docs": [
+            "Founder erhält 65%-Anteil (von der Penalty)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_tokens",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_manual_price",
+      "discriminator": [
+        6,
+        210,
+        4,
+        51,
+        43,
+        53,
+        139,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "founder",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports_per_10k",
           "type": "u64"
         }
       ]
@@ -528,6 +747,11 @@
       "code": 6008,
       "name": "ContributionOutOfRange",
       "msg": "Beitrag außerhalb des erlaubten Bereichs (0.5–10 SOL)."
+    },
+    {
+      "code": 6009,
+      "name": "InvalidPrice",
+      "msg": "Ungültiger Preis."
     }
   ],
   "types": [
