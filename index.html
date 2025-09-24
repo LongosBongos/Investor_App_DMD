@@ -2,135 +2,63 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0f14" />
     <meta name="color-scheme" content="dark light" />
-    <meta name="description" content="Die Mark Digital — Investor App (Solana)" />
-
-    <!-- Social cards -->
-    <meta property="og:title" content="Die Mark Digital — Investor App" />
-    <meta property="og:description" content="Buy • Sell • Claim — sicher über deinen Wallet-Adapter." />
+    <meta name="description" content="DIE MARK DIGITAL — Handelsplattform · Marktplatz" />
+    <meta property="og:title" content="DIE MARK DIGITAL — Handelsplattform" />
+    <meta property="og:description" content="Buy • Sell • Claim • Swap — sicher & transparent auf Solana." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/og.png" />
-
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-
-    <!-- Fonts: Blackletter für Logo + klare UI-Schrift -->
+    <meta property="og:image" content="./og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet" />
-
-    <title>Die Mark Digital — Investor App</title>
-
-    <!-- Minimal Global Styles (du kannst später in /src/index.css auslagern) -->
-    <style>
-      :root {
-        --bg: #0b0f14;
-        --panel: #11161d;
-        --panel-2: #161c24;
-        --text: #e6edf3;
-        --muted: #aab2bd;
-        --gold: #d4af37;
-        --accent: #14f195; /* Solana grün */
-        --radius: 14px;
-        --shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.02);
-      }
-      * { box-sizing: border-box; }
-      html, body, #root { height: 100%; }
-      body {
-        margin: 0;
-        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
-        color: var(--text);
-        background:
-          radial-gradient(1200px 800px at 80% -10%, #12202f 0%, rgba(18,32,47,0) 60%),
-          radial-gradient(1000px 600px at -10% 120%, #1c2230 0%, rgba(28,34,48,0) 60%),
-          var(--bg);
-      }
-      .app-shell {
-        min-height: 100%;
-        display: grid;
-        grid-template-rows: auto 1fr auto;
-      }
-      header {
-        position: sticky; top: 0; z-index: 20;
-        backdrop-filter: blur(8px);
-        background: rgba(11,15,20,.6);
-        border-bottom: 1px solid rgba(255,255,255,.06);
-      }
-      .container {
-        max-width: 1100px; margin: 0 auto; padding: 14px 18px;
-      }
-      .brand {
-        display: flex; align-items: baseline; gap: 12px;
-      }
-      .brand__mark {
-        font-family: "UnifrakturCook", serif;
-        font-size: clamp(20px, 2.2vw + 14px, 32px);
-        letter-spacing: .5px;
-        color: var(--gold);
-        text-shadow: 0 0 22px rgba(212,175,55,.25);
-        user-select: none;
-      }
-      .brand__sub { color: var(--muted); font-size: 13px; }
-      main { padding: 24px 18px; }
-      footer {
-        border-top: 1px solid rgba(255,255,255,.06);
-        color: var(--muted);
-        font-size: 12px;
-      }
-      /* Noscript Hinweis */
-      .noscript {
-        margin: 18px auto;
-        max-width: 900px;
-        background: var(--panel);
-        border: 1px solid rgba(255,255,255,.08);
-        border-radius: var(--radius);
-        padding: 14px 16px;
-        box-shadow: var(--shadow);
-        color: #ffb4b4;
-      }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <title>DIE MARK DIGITAL — Handelsplattform</title>
   </head>
 
   <body>
-    <div class="app-shell">
-      <header>
-        <div class="container">
-          <div class="brand">
-            <div class="brand__mark">Die Mark Digital</div>
-            <div class="brand__sub">Investor&nbsp;App · Solana</div>
-          </div>
-        </div>
-      </header>
+    <header>
+      <div class="brand">
+        <span class="brand__die">DIE</span>
+        <span class="brand__fraktur">MARK DIGITAL</span>
+      </div>
+      <div class="subline">HANDELSPLATTFORM · MARKTPLATZ</div>
 
-      <main>
-        <noscript>
-          <div class="noscript">
-            Diese App benötigt JavaScript (Wallet-Connect, Transaktionen, etc.). Bitte aktivieren.
-          </div>
-        </noscript>
-        <div id="root"></div>
-      </main>
+      <!-- Socials (Inline-SVG) -->
+      <nav class="socials" aria-label="Social Links">
+        <!-- X / Twitter -->
+        <a class="social-btn" href="https://x.com/DieMarkDigital" target="_blank" rel="noreferrer" aria-label="X / Twitter" title="X / Twitter">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.46 0H1.54A1.54 1.54 0 000 1.54v20.92A1.54 1.54 0 001.54 24h20.92A1.54 1.54 0 0024 22.46V1.54A1.54 1.54 0 0022.46 0zM9.56 6.75h2.11l2.08 3 2.87-3h2.09l-3.86 4 4.18 5.5h-2.17l-3.1-4.07-3.9 4.07H8.78l4.01-4.19-3.23-4.31z"/></svg>
+        </a>
+        <!-- Instagram -->
+        <a class="social-btn" href="https://www.instagram.com/dmdcoin?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" target="_blank" rel="noreferrer" aria-label="Instagram" title="Instagram">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.75 2h8.5A4.25 4.25 0 0120.5 6.25v8.5A4.25 4.25 0 0116.25 19h-8.5A4.25 4.25 0 013.5 14.75v-8.5A4.25 4.25 0 017.75 2zm8.5 1.5h-8.5A2.75 2.75 0 004.5 6.25v8.5A2.75 2.75 0 007.25 17.5h8.5a2.75 2.75 0 002.75-2.75v-8.5A2.75 2.75 0 0016.25 3.5zM12 7.75a4.25 4.25 0 110 8.5 4.25 4.25 0 010-8.5zm4.75.75a.9.9 0 110 1.8.9.9 0 010-1.8z"/></svg>
+        </a>
+        <!-- TikTok -->
+        <a class="social-btn" href="https://www.tiktok.com/@dmdcoindiemarkdigital" target="_blank" rel="noreferrer" aria-label="TikTok" title="TikTok">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2h3.1c.06 1.46.58 2.74 1.54 3.83A6.8 6.8 0 0021.5 7.6v3.1c-1.17-.06-2.28-.38-3.33-.95v7.06c0 1.63-.5 3.02-1.47 4.18-1.05 1.21-2.4 1.92-4 2.12-1.87.25-3.57-.22-5.1-1.45-1.46-1.19-2.34-2.76-2.6-4.71-.32-2.37.28-4.43 1.79-6.18 1.38-1.59 3.03-2.38 4.96-2.38.34 0 .67.02 1 .07v3.3c-.32-.1-.65-.16-.98-.16-1.18.02-2.12.48-2.8 1.4-.45.61-.65 1.29-.59 2.04.08 1.1.58 1.96 1.49 2.56.6.38 1.26.54 2 .47.5-.06.94-.26 1.3-.63.36-.37.54-.83.54-1.36V2z"/></svg>
+        </a>
+        <!-- Whitepaper -->
+        <a class="social-btn" href="https://drive.google.com/file/d/1-wT6aRG2XvMPJoQLEmnFLNpjnS9RB5mH/view?usp=sharing" target="_blank" rel="noreferrer" aria-label="Whitepaper" title="Whitepaper">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2a2 2 0 00-2 2v16c0 1.1.9 2 2 2h12a2 2 0 002-2V7.5L14.5 2H6zm7 1.5L18.5 9H13V3.5z"/></svg>
+        </a>
+      </nav>
+    </header>
 
-      <footer>
-        <div class="container">
-          © <span id="y"></span> Die Mark Digital · Buy • Sell • Claim
-        </div>
-      </footer>
-    </div>
+    <main>
+      <div id="root"></div>
+    </main>
 
-    <script>
-      // Jahr im Footer setzen, minimale UX
-      document.getElementById('y')?.append(new Date().getFullYear());
-    </script>
+    <footer>
+      © <span id="y"></span> DIE MARK DIGITAL · Buy · Sell · Claim · Swap
+    </footer>
 
-    <!-- Vite entry -->
-    <script type="module" src="/src/main.jsx"></script>
+    <script>document.getElementById("y")?.append(new Date().getFullYear());</script>
+    <script type="module" src="src/main.jsx"></script>
   </body>
 </html>
+
 

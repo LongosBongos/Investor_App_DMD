@@ -7,7 +7,11 @@ import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 export const PROGRAM_ID = new PublicKey("EDY4bp4fXWkAJpJhXUMZLL7fjpDhpKZQFPpygzsTMzro");
 export const DMD_MINT   = new PublicKey("3rCZT3Xw6jvU4JWatQPsivS8fQ7gV7GjUfJnbTk9Ssn5");
 export const FOUNDER    = new PublicKey("AqPFb5LWQuzKiyoKTX9XgUwsYWoFvpeE8E8uzQvnDTzT");
-export const TREASURY   = new PublicKey("CEUmazdgtbUCcQyLq6NCm4BuQbvCsS5wdRvZehV");
+// ✅ Fix: richtiger Treasury-Key (siehe .env/VITE_TREASURY)
+export const TREASURY   = new PublicKey("CEUmazdgtbUCcQyLq6NCm4BuQbvCsYFzKsS5wdRvZehV"); // :contentReference[oaicite:4]{index=4}
+
+// Associated Token Program (Konstante statt Inline)
+export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"); // :contentReference[oaicite:5]{index=5}
 
 /** ================== Seeds / PDAs ================== **/
 export const VAULT_SEED = Buffer.from("vault");
@@ -77,7 +81,7 @@ export function ixInitialize(
   const buyerState = findBuyerPdaSync(vault, founderPubkey);
   const founderAta = PublicKey.findProgramAddressSync(
     [founderPubkey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
-    new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+    ASSOCIATED_TOKEN_PROGRAM_ID
   )[0];
 
   const keys: IAccountMeta[] = [
@@ -125,6 +129,22 @@ export function ixWhitelistAdd(
   return ix_fromCoder(ixCoder, "whitelist_add", keys, { status });
 }
 
+// ✅ auto_whitelist_self() – Self-WL ohne Founder-Sig (IDL)
+export function ixAutoWhitelistSelf(
+  ixCoder: anchor.BorshInstructionCoder,
+  buyerPubkey: PublicKey
+) {
+  const vault = findVaultPdaSync();
+  const buyerState = findBuyerPdaSync(vault, buyerPubkey);
+  const keys: IAccountMeta[] = [
+    { pubkey: vault,       isSigner: false, isWritable: true  },
+    { pubkey: buyerState,  isSigner: false, isWritable: true  },
+    { pubkey: buyerPubkey, isSigner: true,  isWritable: true  },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ];
+  return ix_fromCoder(ixCoder, "auto_whitelist_self", keys, {}); // :contentReference[oaicite:6]{index=6}
+}
+
 // buy_dmd(sol_contribution: u64)
 export function ixBuyDmd(
   ixCoder: anchor.BorshInstructionCoder,
@@ -137,11 +157,11 @@ export function ixBuyDmd(
   const buyerState = findBuyerPdaSync(vault, buyerPubkey);
   const vAta = PublicKey.findProgramAddressSync(
     [vault.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
-    new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+    ASSOCIATED_TOKEN_PROGRAM_ID
   )[0];
   const bAta = PublicKey.findProgramAddressSync(
     [buyerPubkey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
-    new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+    ASSOCIATED_TOKEN_PROGRAM_ID
   )[0];
 
   const keys: IAccountMeta[] = [
@@ -155,7 +175,7 @@ export function ixBuyDmd(
     { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
   ];
-  return ix_fromCoder(ixCoder, "buy_dmd", keys, { sol_contribution: solContributionLamports });
+  return ix_fromCoder(ixCoder, "buy_dmd", keys, { sol_contribution: solContributionLamports }); // :contentReference[oaicite:7]{index=7}
 }
 
 // claim_reward (v1 – nur State)
@@ -187,7 +207,7 @@ export function ixSetManualPrice(
   return ix_fromCoder(ixCoder, "set_manual_price", keys, { lamports_per_10k: lamportsPer10k });
 }
 
-// claim_reward_v2 (echter SPL-Transfer)
+// ✅ claim_reward_v2 (echter SPL-Transfer)
 export function ixClaimRewardV2(
   ixCoder: anchor.BorshInstructionCoder,
   buyerPubkey: PublicKey
@@ -196,11 +216,11 @@ export function ixClaimRewardV2(
   const buyerState = findBuyerPdaSync(vault, buyerPubkey);
   const vAta = PublicKey.findProgramAddressSync(
     [vault.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
-    new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+    ASSOCIATED_TOKEN_PROGRAM_ID
   )[0];
   const bAta = PublicKey.findProgramAddressSync(
     [buyerPubkey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
-    new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+    ASSOCIATED_TOKEN_PROGRAM_ID
   )[0];
 
   const keys: IAccountMeta[] = [
@@ -211,7 +231,77 @@ export function ixClaimRewardV2(
     { pubkey: buyerPubkey, isSigner: true,  isWritable: false },
     { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
   ];
-  return ix_fromCoder(ixCoder, "claim_reward_v2", keys, {});
+  return ix_fromCoder(ixCoder, "claim_reward_v2", keys, {}); // :contentReference[oaicite:8]{index=8}
+}
+
+// ✅ swap_exact_sol_for_dmd(amount_in_lamports, min_out_dmd)
+export function ixSwapExactSolForDmd(
+  ixCoder: anchor.BorshInstructionCoder,
+  buyerPubkey: PublicKey,
+  amountLamports: anchor.BN,
+  minOutDmd: anchor.BN
+) {
+  const vault      = findVaultPdaSync();
+  const buyerState = findBuyerPdaSync(vault, buyerPubkey);
+  const vAta = PublicKey.findProgramAddressSync(
+    [vault.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  )[0];
+  const bAta = PublicKey.findProgramAddressSync(
+    [buyerPubkey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  )[0];
+
+  const keys: IAccountMeta[] = [
+    { pubkey: vault,       isSigner: false, isWritable: true  },
+    { pubkey: buyerState,  isSigner: false, isWritable: true  },
+    { pubkey: vAta,        isSigner: false, isWritable: true  },
+    { pubkey: bAta,        isSigner: false, isWritable: true  },
+    { pubkey: FOUNDER,     isSigner: false, isWritable: true  },
+    { pubkey: TREASURY,    isSigner: false, isWritable: true  },
+    { pubkey: buyerPubkey, isSigner: true,  isWritable: true  },
+    { pubkey: TOKEN_PROGRAM_ID,       isSigner: false, isWritable: false },
+    { pubkey: SystemProgram.programId,isSigner: false, isWritable: false },
+  ];
+  return ix_fromCoder(ixCoder, "swap_exact_sol_for_dmd", keys, {
+    amount_in_lamports: amountLamports,
+    min_out_dmd: minOutDmd,
+  }); // :contentReference[oaicite:9]{index=9}
+}
+
+// ✅ swap_exact_dmd_for_sol(amount_in_dmd, min_out_sol)
+export function ixSwapExactDmdForSol(
+  ixCoder: anchor.BorshInstructionCoder,
+  buyerPubkey: PublicKey,
+  amountInDmd: anchor.BN,
+  minOutLamports: anchor.BN
+) {
+  const vault      = findVaultPdaSync();
+  const buyerState = findBuyerPdaSync(vault, buyerPubkey);
+  const vAta = PublicKey.findProgramAddressSync(
+    [vault.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  )[0];
+  const bAta = PublicKey.findProgramAddressSync(
+    [buyerPubkey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  )[0];
+
+  const keys: IAccountMeta[] = [
+    { pubkey: vault,       isSigner: false, isWritable: true  },
+    { pubkey: buyerState,  isSigner: false, isWritable: true  },
+    { pubkey: vAta,        isSigner: false, isWritable: true  },
+    { pubkey: bAta,        isSigner: false, isWritable: true  },
+    { pubkey: TREASURY,    isSigner: false, isWritable: true  },
+    { pubkey: FOUNDER,     isSigner: false, isWritable: true  },
+    { pubkey: buyerPubkey, isSigner: true,  isWritable: true  },
+    { pubkey: TOKEN_PROGRAM_ID,       isSigner: false, isWritable: false },
+    { pubkey: SystemProgram.programId,isSigner: false, isWritable: false },
+  ];
+  return ix_fromCoder(ixCoder, "swap_exact_dmd_for_sol", keys, {
+    amount_in_dmd: amountInDmd,
+    min_out_sol: minOutLamports,
+  }); // :contentReference[oaicite:10]{index=10}
 }
 
 // sell_dmd_v2(amount_tokens: u64) – Treasury muss signieren!
@@ -226,11 +316,11 @@ export function ixSellDmdV2(
   const buyerState = findBuyerPdaSync(vault, buyerPubkey);
   const vAta = PublicKey.findProgramAddressSync(
     [vault.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
-    new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+    ASSOCIATED_TOKEN_PROGRAM_ID
   )[0];
   const bAta = PublicKey.findProgramAddressSync(
     [buyerPubkey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), DMD_MINT.toBuffer()],
-    new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+    ASSOCIATED_TOKEN_PROGRAM_ID
   )[0];
 
   const keys: IAccountMeta[] = [
@@ -248,3 +338,4 @@ export function ixSellDmdV2(
 }
 
 export { SystemProgram, TOKEN_PROGRAM_ID };
+

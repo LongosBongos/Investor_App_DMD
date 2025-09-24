@@ -7,6 +7,79 @@
   },
   "instructions": [
     {
+      "name": "auto_whitelist_self",
+      "docs": [
+        "Käufer kann sich selbst whitelisten, wenn seine Wallet >= 0,5 SOL hält.",
+        "Keine Founder-Signatur nötig. BuyerState wird bei Bedarf angelegt."
+      ],
+      "discriminator": [
+        58,
+        140,
+        157,
+        210,
+        236,
+        85,
+        159,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "buy_dmd",
       "discriminator": [
         118,
@@ -540,6 +613,229 @@
       "args": [
         {
           "name": "lamports_per_10k",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "swap_exact_dmd_for_sol",
+      "docs": [
+        "SELL Swap: Token vom User zurück zum Vault, berechnet SOL via Manual-Preis,",
+        "Hold-Penalty (innerhalb 30 Tagen volle PENALTY_MAX, sonst PENALTY_MIN? -> klassisch nach deinem V2-Stil: Penalty nur wenn Hold nicht erfüllt),",
+        "Auszahlung aus Treasury an User + 65/35 auf Penalty an Founder/Treasury."
+      ],
+      "discriminator": [
+        207,
+        148,
+        8,
+        253,
+        245,
+        84,
+        97,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "docs": [
+            "Vault-ATA (Owner = PDA)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_dmd_ata",
+          "docs": [
+            "User-ATA"
+          ],
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury zahlt SOL & split"
+          ],
+          "writable": true
+        },
+        {
+          "name": "founder",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in_dmd",
+          "type": "u64"
+        },
+        {
+          "name": "min_out_sol",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "swap_exact_sol_for_dmd",
+      "docs": [
+        "BUY Swap: nimmt `amount_in_lamports`, Auto-WL, 60/40-Split,",
+        "überträgt DMD aus Vault-ATA → User-ATA; setzt min_out_dmd als Slippage-Schutz."
+      ],
+      "discriminator": [
+        64,
+        104,
+        47,
+        179,
+        12,
+        0,
+        23,
+        147
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "docs": [
+            "Vault-ATA (Owner = PDA)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_dmd_ata",
+          "docs": [
+            "User-ATA"
+          ],
+          "writable": true
+        },
+        {
+          "name": "founder",
+          "docs": [
+            "Auszahlung 60/40"
+          ],
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "min_out_dmd",
           "type": "u64"
         }
       ]
