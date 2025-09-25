@@ -25,3 +25,9 @@ dist-ssr
 
 # build
 /dist
+
+# Environment files
+.env
+.env.*
+!.env.example
+
