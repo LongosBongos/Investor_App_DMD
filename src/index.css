@@ -129,6 +129,28 @@ main {
 .action-btn:active { transform: translateY(0); }
 .action-btn:nth-child(2) { background: linear-gradient(180deg, var(--gold-dark), var(--gold-900)); }
 
+/* === SWAP Button: immer sichtbar aktiv === */
+.action-btn.swap-btn {
+  opacity: 1 !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  filter: none !important;
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark)) !important;
+  border-color: rgba(212,175,55,.4) !important;
+  color: #1a1203 !important;
+  box-shadow: 0 6px 22px rgba(212,175,55,.55) !important;
+}
+fieldset:disabled .action-btn.swap-btn {
+  opacity: 1 !important;
+  filter: none !important;
+  pointer-events: auto !important;
+}
+.action-btn.swap-btn:disabled {
+  opacity: .6 !important;
+  cursor: not-allowed !important;
+  filter: grayscale(15%) !important;
+}
+
 /* ===== Social Icons ===== */
 .socials {
   display: flex;
@@ -175,7 +197,7 @@ footer {
   padding: 18px;
 }
 
-/* ===== Branding (Fix: "DIE" gleich wie "MARK DIGITAL") ===== */
+/* ===== Branding ===== */
 .brand { display: inline-flex; gap: .5ch; align-items: baseline; }
 .brand__die,
 .brand__fraktur {
