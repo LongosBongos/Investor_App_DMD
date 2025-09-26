@@ -1,0 +1,30 @@
+diff --git a/src/App.tsx b/src/App.tsx
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -214,6 +214,12 @@ function UI() {
+   const short = (pk: PublicKey) => { const s = pk.toBase58(); return `${s.slice(0,4)}…${s.slice(-4)}`; };
+   const fmtUSD = (x: number | null) => x == null ? "…" : new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(x);
+   const slippageFactor = Math.max(0, 1 - (Number(slippagePct || "0") / 100));
++
++  // ---- Number formatting helpers for Pricing card
++  const fmtNum = (x: number | null, min = 0, max = 9) =>
++    x == null ? "…" : new Intl.NumberFormat("en-US", { minimumFractionDigits: min, maximumFractionDigits: max }).format(x);
++  const fmtFix = (x: number | null, digits = 6) =>
++    x == null ? "…" : x.toFixed(digits);
+ 
+   // ===== Aktionen (IDL-konform) =====
+   async function handleAutoWhitelist() {
+@@ -315,11 +321,11 @@ function UI() {
+             <div className="muted small">Manual Price</div>
+             <div className="kv">
+               <span>SOL / 10k</span>
+-              <b>{priceSol10k == null ? "…" : priceSol10k.toFixed(6)}</b>
++              <b>{fmtFix(priceSol10k, 6)}</b>
+             </div>
+             <div className="kv">
+               <span>SOL / DMD</span>
+-              <b>{priceSol1Dmd == null ? "…" : priceSol1Dmd.toFixed(9)}</b>
++              <b>{fmtNum(priceSol1Dmd, 0, 9)}</b>
+             </div>
+             <div className="kv">
+               <span>USD / DMD</span>

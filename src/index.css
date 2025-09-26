@@ -54,6 +54,48 @@ main {
   padding: 40px 20px;
 }
 
+/* ===== WalletBar (Connect / Disconnect) ===== */
+.walletbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--anthrazit-light);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--glow);
+}
+.walletbar .btn {
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  color: #000;
+  font-weight: 600;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.walletbar .btn:hover:not(:disabled) {
+  background: var(--gold-dark);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(212,175,55,.7);
+  transform: translateY(-1px);
+}
+.walletbar .btn:disabled {
+  background: #444;
+  color: #aaa;
+  cursor: not-allowed;
+}
+.walletbar .chip {
+  background: var(--gold-dark);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 20px;
+}
+
 /* ===== Action Buttons (Buy / Sell / Claim / Swap) ===== */
 .btn-grid {
   display: grid;
@@ -85,11 +127,9 @@ main {
   cursor: not-allowed;
 }
 .action-btn:active { transform: translateY(0); }
-
-/* Optional Nuancen je Button-Position */
 .action-btn:nth-child(2) { background: linear-gradient(180deg, var(--gold-dark), var(--gold-900)); }
 
-/* ===== Social Icons (inline SVG) ===== */
+/* ===== Social Icons ===== */
 .socials {
   display: flex;
   justify-content: center;
@@ -114,12 +154,7 @@ main {
   box-shadow: 0 0 20px rgba(212,175,55,.6);
   filter: brightness(1.1);
 }
-.social-btn svg { 
-  width: 24px; 
-  height: 24px; 
-  fill: var(--text); 
-  pointer-events: none; /* ganze Fläche klickbar */
-}
+.social-btn svg { width: 24px; height: 24px; fill: var(--text); pointer-events: none; }
 
 /* ===== Footer ===== */
 footer {
@@ -140,16 +175,17 @@ footer {
   padding: 18px;
 }
 
-/* ===== Ergänzungen für App.jsx ===== */
+/* ===== Branding (Fix: "DIE" gleich wie "MARK DIGITAL") ===== */
 .brand { display: inline-flex; gap: .5ch; align-items: baseline; }
-.brand__die {
-  font-family: Inter, sans-serif; font-weight: 800; letter-spacing: 2px;
-  text-transform: uppercase; color: var(--gold); text-shadow: var(--glow);
-}
+.brand__die,
 .brand__fraktur {
-  font-family: "UnifrakturCook", serif;
-  font-size: clamp(36px, 5vw, 64px); letter-spacing: 2px;
-  color: var(--gold); text-shadow: var(--glow);
+  font-family: "UnifrakturCook", serif !important;
+  font-weight: 700 !important;
+  letter-spacing: 2px;
+  font-size: clamp(36px, 5vw, 64px);
+  color: var(--gold);
+  text-shadow: var(--glow);
+  text-transform: none !important;
 }
 
 /* Typo-Helfer */
@@ -161,27 +197,6 @@ footer {
 .panel-title { font-weight: 700; margin-bottom: 10px; }
 .kv { display:flex; justify-content:space-between; align-items:center; padding:6px 0; }
 .hr { height:1px; background: var(--border-2); margin:12px 0; }
-
-/* Badge / Chip (Whitelist-Status) */
-.chip {
-  background: rgba(0,0,0,.35);
-  border: 1px solid var(--border);
-  padding: 6px 10px;
-  border-radius: 999px;
-}
-
-/* Sekundär-Button */
-.btn {
-  appearance: none;
-  border: 1px solid var(--border);
-  background: linear-gradient(180deg, #1a2230, #10151e);
-  color: var(--text);
-  padding: 10px 14px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
-}
-.btn:hover { border-color: rgba(255,255,255,.25); transform: translateY(-1px); }
 
 /* Inputs */
 .input {
@@ -206,7 +221,10 @@ footer {
   .subline { font-size: 14px; }
   .action-btn { font-size: 16px; padding: 14px; }
   .social-btn { width: 44px; height: 44px; }
+  .walletbar { flex-direction: column; align-items: stretch; }
+  .walletbar .btn { width: 100%; }
 }
+
 
 
 

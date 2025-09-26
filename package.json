@@ -7,9 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "postbuild": "node -e \"const fs=require('fs');fs.copyFileSync('dist/index.html','dist/404.html')\"",
-    "preview": "vite preview --port 4173",
+    "preview": "vite preview --base /Investor_App_DMD/ --port 4173",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist -b gh-pages"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
@@ -37,3 +37,4 @@
     "vite": "^5.4.19"
   }
 }
+
