@@ -96,6 +96,9 @@ function UI() {
   const [buyerState, setBuyerState] = useState<any>(null);
   const [whitelisted, setWhitelisted] = useState<boolean>(false);
 
+  // 🔥 NEU: Decimals vom Vault
+  const [mintDecimals, setMintDecimals] = useState<number>(9);
+
   // Inputs
   const [amountSol, setAmountSol] = useState("1.0");     // Buy & SOL->DMD
   const [amountDmd, setAmountDmd] = useState("10000");   // DMD->SOL
@@ -157,6 +160,8 @@ function UI() {
         if (ai?.data) {
           const vault = accCoder.decode("Vault", ai.data);
           setPriceLamports10k(Number((vault as any).initial_price_sol ?? 0));
+          // 🔥 NEU: Decimals aus dem Vault nutzen
+          setMintDecimals(Number((vault as any).mint_decimals ?? 9));
         }
       } catch (e) { console.error(e); }
     })();
@@ -328,6 +333,7 @@ function UI() {
     } catch (e: any) { setStatus(`❌ Claim fehlgeschlagen: ${e?.message ?? e}`); }
   }
 
+  // 🔧 FIXED: SOL → DMD mit korrekter Decimals-Skalierung
   async function handleSwapSolForDmd() {
     try {
       if (!connected || !wallet.publicKey) return alert("Verbinde deine Wallet.");
@@ -341,8 +347,14 @@ function UI() {
       const lamportsIn = new anchor.BN(Math.floor(parseFloat(amountSol) * LAMPORTS_PER_SOL));
       if (lamportsIn.lte(new anchor.BN(0))) return setStatus("❌ Ungültiger SOL-Betrag.");
       if (priceLamports10k == null) return setStatus("❌ Manual-Preis unbekannt.");
-      const dmdOut = (Number(lamportsIn.toString()) * 10_000) / Number(priceLamports10k);
-      const minOut = new anchor.BN(Math.floor(dmdOut * slippageFactor));
+
+      // Erwartete DMD (UI-Einheiten)
+      const dmdOutUi = (Number(lamportsIn.toString()) * 10_000) / Number(priceLamports10k);
+
+      // In base units skalieren
+      const scale = 10 ** mintDecimals;
+      const dmdOutRaw = Math.floor(dmdOutUi * scale);
+      const minOutRaw = Math.floor(dmdOutRaw * Math.max(0, 1 - (Number(slippagePct || "0") / 100)));
 
       const keys = [
         { pubkey: vault, isSigner: false, isWritable: true },
@@ -357,7 +369,7 @@ function UI() {
       ];
       const ix = ixFromCoder("swap_exact_sol_for_dmd", keys, {
         amount_in_lamports: lamportsIn,
-        min_out_dmd: minOut,
+        min_out_dmd: new anchor.BN(minOutRaw),
       });
 
       const tx = new Transaction(); ataIxs.forEach(ix0 => tx.add(ix0)); tx.add(ix);
@@ -367,6 +379,7 @@ function UI() {
     } catch (e: any) { setStatus(`❌ Swap SOL→DMD fehlgeschlagen: ${e?.message ?? e}`); }
   }
 
+  // 🔧 FIXED: DMD → SOL mit korrekter Decimals-Skalierung
   async function handleSwapDmdForSol() {
     try {
       if (!connected || !wallet.publicKey) return alert("Verbinde deine Wallet.");
@@ -377,11 +390,16 @@ function UI() {
       const bAta = ataOf(buyer);
       const { ixs: ataIxs } = await ensureAtas(buyer, buyer, vault);
 
-      const amountInDmd = new anchor.BN(Math.floor(parseFloat(amountDmd)));
-      if (amountInDmd.lte(new anchor.BN(0))) return setStatus("❌ Ungültiger DMD-Betrag.");
+      // Eingabe (UI DMD) → base units
+      const scale = 10 ** mintDecimals;
+      const amountInDmdRaw = Math.floor(parseFloat(amountDmd) * scale);
+      const amountIn = new anchor.BN(amountInDmdRaw);
+      if (amountIn.lte(new anchor.BN(0))) return setStatus("❌ Ungültiger DMD-Betrag.");
       if (priceLamports10k == null) return setStatus("❌ Manual-Preis unbekannt.");
-      const lamportsOut = Number(amountInDmd.toString()) * (Number(priceLamports10k) / 10_000);
-      const minOut = new anchor.BN(Math.floor(lamportsOut * slippageFactor));
+
+      // Erwartete SOL-Out (Lamports); Preis ist lamports / 10k DMD
+      const lamportsOutFloat = (amountInDmdRaw / scale) * (Number(priceLamports10k) / 10_000);
+      const minOutLamports = Math.floor(lamportsOutFloat * Math.max(0, 1 - (Number(slippagePct || "0") / 100)));
 
       const keys = [
         { pubkey: vault, isSigner: false, isWritable: true },
@@ -395,8 +413,8 @@ function UI() {
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ];
       const ix = ixFromCoder("swap_exact_dmd_for_sol", keys, {
-        amount_in_dmd: amountInDmd,
-        min_out_sol: minOut,
+        amount_in_dmd: amountIn,
+        min_out_sol: new anchor.BN(minOutLamports),
       });
 
       const tx = new Transaction(); ataIxs.forEach(ix0 => tx.add(ix0)); tx.add(ix);
