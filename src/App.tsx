@@ -25,7 +25,8 @@ import {
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 import idl from "./idl/dmd_anchor.json";
-import { fetchSolUsd } from "./price";
+import { fetchSolUsd, computeDmdPricing, type DmdPricing } from "./price";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token"; // ✅ Holder-Scan (Token 2020)
 
 // ---- zentrale Solana-Helper
 import {
@@ -42,9 +43,36 @@ import {
 import { Buffer } from "buffer";
 if (typeof window !== "undefined" && !(window as any).Buffer) (window as any).Buffer = Buffer;
 
+// ===== Helper: Holder-Anzahl zählen (Token-2020) =====
+async function fetchHolderCount2020(connection: Connection, mint: PublicKey): Promise<number> {
+  try {
+    const accs = await connection.getParsedProgramAccounts(TOKEN_PROGRAM_ID, {
+      filters: [
+        { memcmp: { offset: 0, bytes: mint.toBase58() } },
+        { dataSize: 165 },
+      ],
+    });
+    const owners = new Set<string>();
+    for (const a of accs) {
+      const info: any = (a.account as any).data?.parsed?.info;
+      if (!info) continue;
+      const ownerStr: string | undefined = info.owner;
+      const amt = info.tokenAmount?.uiAmount as number | undefined;
+      if (!ownerStr || typeof amt !== "number" || !isFinite(amt) || amt <= 0) continue;
+      owners.add(ownerStr);
+    }
+    return owners.size;
+  } catch {
+    return 0;
+  }
+}
+
 // ===== ENV / RPC =====
 const RPC_URL = import.meta.env.VITE_RPC_URL
   ?? "https://mainnet.helius-rpc.com/?api-key=cba27cb3-9d36-4095-ae3a-4025bc7ff611";
+
+// Optional: Treasury-Gewichtung für Backing (0..1)
+const TREASURY_WEIGHT = 1.0;
 
 // ======= UI =======
 function UI() {
@@ -66,6 +94,7 @@ function UI() {
   const [vaultDmd, setVaultDmd] = useState<number | null>(null);
   const [buyerState, setBuyerState] = useState<any>(null);
   const [whitelisted, setWhitelisted] = useState<boolean>(false);
+  const [pricing, setPricing] = useState<DmdPricing | null>(null); // ✅ neu
 
   // Inputs
   const [amountSol, setAmountSol] = useState("1.0");     // Buy & SOL->DMD
@@ -108,20 +137,40 @@ function UI() {
       try {
         const v = findVaultPda();
         const vAta = ataOf(v, DMD_MINT);
-        const [ai, trezLamports, px, dmdBal] = await Promise.all([
+        const [ai, trezLamports, px, dmdBal, holders] = await Promise.all([
           connection.getAccountInfo(v),
           connection.getBalance(TREASURY),
           fetchSolUsd(),
           connection.getTokenAccountBalance(vAta).then(r => r?.value?.uiAmount ?? 0).catch(() => 0),
+          fetchHolderCount2020(connection, DMD_MINT).catch(() => 0), // ✅ Holder-Anzahl
         ]);
         if (!alive) return;
         setTreasurySol(trezLamports / LAMPORTS_PER_SOL);
         setSolUsd(px);
         setSolUpdatedAt(Date.now());
         setVaultDmd(dmdBal);
+
         if (ai?.data) {
           const vault = accCoder.decode("Vault", ai.data);
-          setPriceLamports10k(Number((vault as any).initial_price_sol ?? 0));
+          const lamportsPer10k = Number((vault as any).initial_price_sol ?? 0);
+          setPriceLamports10k(lamportsPer10k);
+
+          // PresalePool = DMD im Vault (Pool)
+          const presalePool = Math.max(0, Math.floor(Number(dmdBal || 0)));
+
+          // ✅ Preisformel V2: Holder, MaxSupply, Treasury-Gewichtung, PresalePool, SOL, Manual
+          const p = await computeDmdPricing({
+            lamportsPer10k,
+            treasuryLamports: trezLamports, // Lamports
+            // 'circulating' lassen wir weg → computeDmdPricing nimmt (maxSupply - presalePool)
+            maxSupply: 150_000_000,
+            manualFloorUsd: 0.01,
+            holders,
+            presalePool,
+            treasuryWeight: TREASURY_WEIGHT,
+          }).catch(() => null);
+
+          if (p) setPricing(p);
         }
       } catch (e) { console.error(e); }
     })();
@@ -258,7 +307,9 @@ function UI() {
       tx.feePayer = buyer; tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       const sig = await wallet.sendTransaction(tx, connection, SEND_OPTS);
       setStatus(`✅ Claim gesendet: ${sig}`);
-    } catch (e: any) { setStatus(`❌ Claim fehlgeschlagen: ${e?.message ?? e}`); }
+    } catch (e: any) {
+      setStatus(`❌ Claim fehlgeschlagen: ${e?.message ?? e}`);
+    }
   }
 
   // 🔧 SOL → DMD (lib.rs: 1 SOL = 10_000 DMD, ohne Manual-Preis)
@@ -406,6 +457,18 @@ function UI() {
             <div className="kv">
               <span>USD / DMD</span>
               <b>{priceUsd1Dmd == null ? "…" : new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:6}).format(priceUsd1Dmd)}</b>
+            </div>
+
+            {/* ✅ Auto-Pricing Anzeige */}
+            <div className="hr" />
+            <div className="muted small">Auto-Pricing (Floor/Manual/Backing)</div>
+            <div className="kv">
+              <span>USD / DMD (final)</span>
+              <b>
+                {pricing?.usdPerDmdFinal != null
+                  ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 6 }).format(pricing.usdPerDmdFinal)
+                  : "…"}
+              </b>
             </div>
 
             {/* Founder Controls */}
@@ -586,5 +649,7 @@ export default function App() {
     </ConnectionProvider>
   );
 }
+
+
 
 
