@@ -74,7 +74,6 @@ const RPC_URL = import.meta.env.VITE_RPC_URL
 // Optional: Treasury-Gewichtung für Backing (0..1)
 const TREASURY_WEIGHT = 1.0;
 
-// ======= UI =======
 function UI() {
   const wallet = useWallet();
   const [connection] = useState(() => new Connection(RPC_URL, "confirmed" as Commitment));
@@ -94,7 +93,7 @@ function UI() {
   const [vaultDmd, setVaultDmd] = useState<number | null>(null);
   const [buyerState, setBuyerState] = useState<any>(null);
   const [whitelisted, setWhitelisted] = useState<boolean>(false);
-  const [pricing, setPricing] = useState<DmdPricing | null>(null); // ✅ neu
+  const [pricing, setPricing] = useState<DmdPricing | null>(null);
 
   // Inputs
   const [amountSol, setAmountSol] = useState("1.0");     // Buy & SOL->DMD
@@ -104,6 +103,20 @@ function UI() {
   // Auto-Price Controls (Founder)
   const [autoSync, setAutoSync] = useState(false);
   const [deviationPct, setDeviationPct] = useState("1.0"); // 1% Schwelle
+
+  // ===== Portfolio-Infos (live) =====
+  const [inspectAddr, setInspectAddr] = useState<string>(""); // optional Read-Only Ansicht
+  const ownerPk: PublicKey | null = useMemo(() => {
+    try {
+      if (inspectAddr && inspectAddr.trim().length > 0) return new PublicKey(inspectAddr.trim());
+    } catch {}
+    return wallet.publicKey ?? null;
+  }, [inspectAddr, wallet.publicKey]);
+
+  const [userSol, setUserSol] = useState<number | null>(null);
+  const [userDmd, setUserDmd] = useState<number | null>(null); // Summe über alle DMD-Tokenkonten
+  const [lastTxWallet, setLastTxWallet] = useState<{sig:string; time:number|null} | null>(null);
+  const [lastTxDmd, setLastTxDmd] = useState<{sig:string; time:number|null} | null>(null);
 
   // $0.01/DMD -> Lamports/10k (10.000 DMD * $0.01 = $100)
   function lamportsPer10kFromSpot(solUsdNow: number): number | null {
@@ -162,7 +175,6 @@ function UI() {
           const p = await computeDmdPricing({
             lamportsPer10k,
             treasuryLamports: trezLamports, // Lamports
-            // 'circulating' lassen wir weg → computeDmdPricing nimmt (maxSupply - presalePool)
             maxSupply: 150_000_000,
             manualFloorUsd: 0.01,
             holders,
@@ -211,6 +223,70 @@ function UI() {
     return () => { alive = false; clearInterval(iv); };
   }, [connected, connection, wallet.publicKey, accCoder]);
 
+  // ===== Portfolio laden: SOL/DMD (alle Tokenkonten) + letzte TXs (Wallet & DMD-ATA)
+  useEffect(() => {
+    let alive = true;
+
+    async function fetchAllDmdUiAmount(owner: PublicKey): Promise<number> {
+      const resp = await connection.getParsedTokenAccountsByOwner(owner, { mint: DMD_MINT });
+      let sum = 0;
+      for (const it of resp.value) {
+        const ui = it.account.data?.parsed?.info?.tokenAmount?.uiAmount;
+        if (typeof ui === "number" && isFinite(ui)) sum += ui;
+      }
+      return sum;
+    }
+
+    async function loadPortfolio() {
+      try {
+        if (!ownerPk) {
+          if (alive) {
+            setUserSol(null);
+            setUserDmd(null);
+            setLastTxWallet(null);
+            setLastTxDmd(null);
+          }
+          return;
+        }
+
+        // SOL-Balance
+        const lam = await connection.getBalance(ownerPk).catch(() => null);
+        if (alive) setUserSol(lam == null ? null : lam / LAMPORTS_PER_SOL);
+
+        // DMD Summe über alle Tokenkonten:
+        const dmdSum = await fetchAllDmdUiAmount(ownerPk).catch(() => 0);
+        if (alive) setUserDmd(dmdSum);
+
+        // letzte Wallet-Transaktion (global)
+        const sigWallet = await connection.getSignaturesForAddress(ownerPk, { limit: 1 }).catch(() => []);
+        if (alive) {
+          const sw = sigWallet?.[0];
+          setLastTxWallet(sw ? { sig: sw.signature, time: sw.blockTime ?? null } : null);
+        }
+
+        // letzte DMD-Transaktion über DMD-ATA(s): nimm die „jüngste“ der DMD Token-Accounts
+        const parsed = await connection.getParsedTokenAccountsByOwner(ownerPk, { mint: DMD_MINT }).catch(() => ({ value: [] as any[] }));
+        let latestDmd: {sig:string; time:number|null} | null = null;
+        for (const it of parsed.value) {
+          const ataAddr = new PublicKey(it.pubkey);
+          const sigs = await connection.getSignaturesForAddress(ataAddr, { limit: 1 }).catch(() => []);
+          const s0 = sigs?.[0];
+          if (!s0) continue;
+          if (!latestDmd || (s0.blockTime ?? 0) > (latestDmd.time ?? 0)) {
+            latestDmd = { sig: s0.signature, time: s0.blockTime ?? null };
+          }
+        }
+        if (alive) setLastTxDmd(latestDmd);
+      } catch (e) {
+        console.error("load portfolio:", e);
+      }
+    }
+
+    loadPortfolio();
+    const iv = setInterval(loadPortfolio, 15_000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [ownerPk, connection]);
+
   // Auto-Sync Manual-Preis
   useEffect(() => {
     if (!autoSync || !wallet.publicKey || !wallet.publicKey.equals(FOUNDER)) return;
@@ -240,11 +316,16 @@ function UI() {
   const short = (pk: PublicKey) => { const s = pk.toBase58(); return `${s.slice(0,4)}…${s.slice(-4)}`; };
   const fmtUSD = (x: number | null) => x == null ? "…" : new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(x);
   const fmtTime = (t: number | null) => t == null ? "—" : new Date(t).toLocaleTimeString('de-DE', { hour12: false });
+  const fmtDateTime = (tsSec: number | null) => tsSec == null ? "—" : new Date(tsSec * 1000).toLocaleString('de-DE', { hour12: false });
   const slippageFactor = Math.max(0, 1 - (Number(slippagePct || "0") / 100));
   const fmtNum = (x: number | null, min = 0, max = 9) =>
     x == null ? "…" : new Intl.NumberFormat("en-US", { minimumFractionDigits: min, maximumFractionDigits: max }).format(x);
   const fmtFix = (x: number | null, digits = 6) =>
     x == null ? "…" : (typeof x === "number" ? x : Number(x)).toFixed(digits);
+
+  // Explorer-Helper
+  const solscanTx = (sig?: string) => sig ? `https://solscan.io/tx/${sig}` : undefined;
+  const solscanAddr = (pk?: PublicKey | null) => pk ? `https://solscan.io/address/${pk.toBase58()}` : undefined;
 
   // ===== Aktionen =====
   async function handleAutoWhitelist() {
@@ -302,8 +383,22 @@ function UI() {
         return setStatus("❌ Claim zu früh (90 Tage).");
 
       setStatus("Sende Claim …");
+      // 🔐 ATAs sicherstellen (Patch)
+      const vault = findVaultPda();
+      const vAta  = ataOf(vault, DMD_MINT);
+      const bAta  = ataOf(buyer, DMD_MINT);
+      const ataIxs: TransactionInstruction[] = [];
+      const [buyerInfo, vaultInfo] = await Promise.all([
+        connection.getAccountInfo(bAta),
+        connection.getAccountInfo(vAta),
+      ]);
+      if (!buyerInfo) ataIxs.push(createAtaIx(buyer, bAta, buyer, DMD_MINT));
+      if (!vaultInfo) ataIxs.push(createAtaIx(buyer, vAta, vault, DMD_MINT));
+
       const ix = ixClaimRewardV2(ixCoder, buyer);
-      const tx = new Transaction().add(ix);
+      const tx = new Transaction();
+      ataIxs.forEach(ix0 => tx.add(ix0));
+      tx.add(ix);
       tx.feePayer = buyer; tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       const sig = await wallet.sendTransaction(tx, connection, SEND_OPTS);
       setStatus(`✅ Claim gesendet: ${sig}`);
@@ -404,6 +499,37 @@ function UI() {
   }
 
   const ENABLE_SELL_BUTTON = true; // sichtbar, aber ohne Treasury-Serverflow
+
+  // ======== Hold/Claim-Badges (abgeleitet aus buyerState) ========
+  const HOLD_DURATION_SEC = 60 * 60 * 24 * 30;
+  const REWARD_INTERVAL_SEC = 60 * 60 * 24 * 90;
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  const holdingSince = Number((buyerState as any)?.holding_since ?? 0);
+  const lastClaim = Number((buyerState as any)?.last_reward_claim ?? 0);
+
+  const holdElapsed = holdingSince > 0 ? Math.max(0, nowSec - holdingSince) : 0;
+  const holdOk = holdingSince > 0 && holdElapsed >= HOLD_DURATION_SEC;
+  const holdRemainSec = holdingSince > 0 ? Math.max(0, HOLD_DURATION_SEC - holdElapsed) : 0;
+
+  // nächster Claim: wenn noch nie geclaimed → ab holding_since + 90 Tage
+  // sonst ab last_reward_claim + 90 Tage
+  const nextClaimBase = (lastClaim > 0 ? lastClaim : holdingSince) + REWARD_INTERVAL_SEC;
+  const nextClaimRemainSec = (holdingSince > 0) ? Math.max(0, nextClaimBase - nowSec) : 0;
+  const claimReady = holdOk && nextClaimRemainSec === 0;
+
+  function fmtDur(totalSec: number): string {
+    const d = Math.floor(totalSec / 86400);
+    const h = Math.floor((totalSec % 86400) / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = Math.floor(totalSec % 60);
+    const parts: string[] = [];
+    if (d) parts.push(`${d}d`);
+    if (h || d) parts.push(`${h}h`);
+    if (m || h || d) parts.push(`${m}m`);
+    parts.push(`${s}s`);
+    return parts.join(" ");
+    }
 
   return (
     <>
@@ -512,9 +638,11 @@ function UI() {
             )}
           </div>
 
-          {/* Treasury Panel */}
+          {/* Treasury Panel (inkl. Portfolio + Hold/Claim) */}
           <div className="panel">
             <div className="panel-title" style={{ color: "var(--gold)" }}>Treasury</div>
+
+            {/* Treasury Kennzahlen */}
             <div className="kv">
               <span>SOL</span>
               <b>{treasurySol == null ? "…" : treasurySol.toFixed(4)}</b>
@@ -525,7 +653,14 @@ function UI() {
             </div>
             <div className="kv small muted">
               <span>Treasury</span>
-              <span className="mono">{TREASURY ? TREASURY.toBase58().slice(0,4)+"…"+TREASURY.toBase58().slice(-4) : "…"}</span>
+              <span className="mono">
+                {TREASURY ? TREASURY.toBase58().slice(0,4)+"…"+TREASURY.toBase58().slice(-4) : "…"}
+              </span>
+              {TREASURY && (
+                <a className="small" href={solscanAddr(TREASURY)} target="_blank" rel="noreferrer" style={{ marginLeft: 8 }}>
+                  (Solscan)
+                </a>
+              )}
             </div>
             <div className="hr"></div>
             <div className="kv">
@@ -534,6 +669,110 @@ function UI() {
             </div>
             {presaleUsdManual != null && (
               <div className="small muted">≈ {fmtUSD(presaleUsdManual)} @ Manual</div>
+            )}
+
+            {/* ==== Dein Portfolio (im Treasury-Panel integriert) ==== */}
+            <div className="hr" />
+            <div className="panel-title" style={{ color: "var(--gold)", fontSize: 16, marginBottom: 8 }}>
+              Dein Portfolio (live)
+            </div>
+
+            {/* Read-only Inspect-Feld (optional) */}
+            <div className="kv">
+              <span>Wallet ansehen</span>
+              <input
+                className="input"
+                placeholder="Wallet-Adresse (optional, sonst eigene)"
+                value={inspectAddr}
+                onChange={(e)=>setInspectAddr(e.target.value.trim())}
+              />
+            </div>
+            <div className="kv small muted" style={{ marginTop: 6 }}>
+              <span>Adresse</span>
+              <b className="mono">
+                {ownerPk ? ownerPk.toBase58().slice(0,4)+"…"+ownerPk.toBase58().slice(-4) : "—"}
+              </b>
+              {ownerPk && (
+                <a className="small" href={solscanAddr(ownerPk)} target="_blank" rel="noreferrer" style={{ marginLeft: 8 }}>
+                  (Solscan)
+                </a>
+              )}
+            </div>
+
+            {/* DMD */}
+            <div className="kv" style={{ marginTop: 8 }}>
+              <span>DMD</span>
+              <b>{userDmd == null ? "…" : userDmd.toLocaleString()}</b>
+            </div>
+            <div className="kv small muted">
+              <span>≈ USD (Manual/Floor)</span>
+              <b>
+                {(() => {
+                  const usd = (userDmd != null && priceUsd1Dmd != null) ? userDmd * priceUsd1Dmd : null;
+                  return usd == null ? "…" : new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(usd);
+                })()}
+              </b>
+            </div>
+
+            {/* SOL */}
+            <div className="kv" style={{ marginTop: 8 }}>
+              <span>SOL</span>
+              <b>{userSol == null ? "…" : userSol.toFixed(4)}</b>
+            </div>
+            <div className="kv small muted">
+              <span>≈ USD (Spot)</span>
+              <b>{(userSol != null && solUsd > 0) ? new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(userSol * solUsd) : "…"}</b>
+            </div>
+
+            {/* Hold/Claim-Status */}
+            <div className="hr" />
+            <div className="panel-title" style={{ color: "var(--gold)", fontSize: 16, marginBottom: 6 }}>
+              Hold &amp; Claim
+            </div>
+
+            <div className="kv">
+              <span>30-Tage-Hold</span>
+              <span className="chip" style={{
+                background: holdOk ? "rgba(46, 204, 113, .15)" : "rgba(241, 196, 15, .15)",
+                border: `1px solid ${holdOk ? "#2ecc71" : "#f1c40f"}`,
+                color: holdOk ? "#2ecc71" : "#f1c40f"
+              }}>
+                {holdOk ? "erfüllt ✅" : (holdingSince ? `noch ${fmtDur(holdRemainSec)}` : "—")}
+              </span>
+            </div>
+
+            <div className="kv">
+              <span>Nächster Claim</span>
+              <span className="chip" style={{
+                background: claimReady ? "rgba(46, 204, 113, .15)" : "rgba(52, 152, 219, .15)",
+                border: `1px solid ${claimReady ? "#2ecc71" : "#3498db"}`,
+                color: claimReady ? "#2ecc71" : "#3498db"
+              }}>
+                {holdingSince === 0
+                  ? "—"
+                  : (claimReady ? "bereit ✅" : `in ${fmtDur(nextClaimRemainSec)}`)}
+              </span>
+            </div>
+
+            {/* Letzte Transaktionen */}
+            <div className="hr" />
+            <div className="kv">
+              <span>Letzte Wallet-TX</span>
+              <b>{lastTxWallet ? fmtDateTime(lastTxWallet.time) : "—"}</b>
+            </div>
+            {lastTxWallet?.sig && (
+              <div className="small muted">
+                <a href={solscanTx(lastTxWallet.sig)} target="_blank" rel="noreferrer">Auf Solscan öffnen</a>
+              </div>
+            )}
+            <div className="kv" style={{ marginTop: 6 }}>
+              <span>Letzte DMD-TX</span>
+              <b>{lastTxDmd ? fmtDateTime(lastTxDmd.time) : "—"}</b>
+            </div>
+            {lastTxDmd?.sig && (
+              <div className="small muted">
+                <a href={solscanTx(lastTxDmd.sig)} target="_blank" rel="noreferrer">Auf Solscan öffnen</a>
+              </div>
             )}
           </div>
         </div>
@@ -649,7 +888,6 @@ export default function App() {
     </ConnectionProvider>
   );
 }
-
 
 
 
