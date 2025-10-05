@@ -1,0 +1,22 @@
+Contact: mailto:diemarkdigital@gmail.com
+Acknowledgments: https://longosbongos.github.io/Investor_App_DMD/security
+Preferred-Languages: en, de
+Canonical: https://longosbongos.github.io/Investor_App_DMD/.well-known/security.txt
+Policy: https://longosbongos.github.io/DMD-Allocatetd/policy/
+Expires: 2026-10-01T00:00:00Z
+
+# ---- Project Info ----
+# Project: Die Mark Digital (DMD)
+# Program-ID: EDY4bp4fXWkAJpJhXUMZLL7fjpDhpKZQFPpygzsTMzro
+# Mint: 3rCZT3Xw6jvU4JWatQPsivS8fQ7gV7GjUfJnbTk9Ssn5
+# Vault-PDA: AfbZG6WHh462YduimCUmAvVi3jSjGfkaQCyEnYPeXwPF
+# Pool: 6xBMvGzomHgPdWtD3V4JQ8rqji5EWtFDDoAyQhYsVVd2
+
+# ---- Disclaimer ----
+# Die Mark Digital (DMD) ist ein Community- und Treasury-basiertes Projekt.
+# Es handelt sich NICHT um ein gesetzliches Zahlungsmittel, eine Aktie oder ein Wertpapier.
+# Anleger handeln eigenverantwortlich und tragen das volle Risiko.
+# Es bestehen keine Rückzahlungsansprüche gegenüber dem Founder oder der Treasury.
+# Alle Einlagen in SOL oder DMD sind final und können nicht rückerstattet werden.
+# Die Nutzung von DMD erfolgt ausschließlich auf eigenes Risiko.
+# Der Founder übernimmt keinerlei Haftung für Verluste, Fehlverhalten Dritter oder technische Fehler.
