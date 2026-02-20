@@ -1,0 +1,5 @@
+<svg width="1200" height="1200" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="600" cy="600" r="520" fill="none" stroke="#f5c542" stroke-opacity=".1" stroke-width="8"/>
+  <text x="50%" y="50%" font-size="160" fill="#f5c542" fill-opacity=".07"
+        dominant-baseline="middle" text-anchor="middle" font-family="Georgia,serif">DIE MARK DIGITAL</text>
+</svg>
