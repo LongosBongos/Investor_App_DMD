@@ -8,10 +8,6 @@
   "instructions": [
     {
       "name": "auto_whitelist_self",
-      "docs": [
-        "Käufer kann sich selbst whitelisten, wenn seine Wallet >= 0,5 SOL hält.",
-        "Keine Founder-Signatur nötig. BuyerState wird bei Bedarf angelegt."
-      ],
       "discriminator": [
         58,
         140,
@@ -146,16 +142,10 @@
         },
         {
           "name": "vault_token_account",
-          "docs": [
-            "NEU: Vault-ATA (Owner = PDA)"
-          ],
           "writable": true
         },
         {
           "name": "buyer_token_account",
-          "docs": [
-            "Käufer-ATA"
-          ],
           "writable": true
         },
         {
@@ -541,17 +531,11 @@
         },
         {
           "name": "treasury",
-          "docs": [
-            "Treasury zahlt SOL aus (Signer!)"
-          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "founder",
-          "docs": [
-            "Founder erhält 65%-Anteil (von der Penalty)"
-          ],
           "writable": true
         },
         {
@@ -619,11 +603,6 @@
     },
     {
       "name": "swap_exact_dmd_for_sol",
-      "docs": [
-        "SELL Swap: Token vom User zurück zum Vault, berechnet SOL via Manual-Preis,",
-        "Hold-Penalty (innerhalb 30 Tagen volle PENALTY_MAX, sonst PENALTY_MIN? -> klassisch nach deinem V2-Stil: Penalty nur wenn Hold nicht erfüllt),",
-        "Auszahlung aus Treasury an User + 65/35 auf Penalty an Founder/Treasury."
-      ],
       "discriminator": [
         207,
         148,
@@ -681,23 +660,14 @@
         },
         {
           "name": "vault_token_account",
-          "docs": [
-            "Vault-ATA (Owner = PDA)"
-          ],
           "writable": true
         },
         {
           "name": "user_dmd_ata",
-          "docs": [
-            "User-ATA"
-          ],
           "writable": true
         },
         {
           "name": "treasury",
-          "docs": [
-            "Treasury zahlt SOL & split"
-          ],
           "writable": true
         },
         {
@@ -731,10 +701,6 @@
     },
     {
       "name": "swap_exact_sol_for_dmd",
-      "docs": [
-        "BUY Swap: nimmt `amount_in_lamports`, Auto-WL, 60/40-Split,",
-        "überträgt DMD aus Vault-ATA → User-ATA; setzt min_out_dmd als Slippage-Schutz."
-      ],
       "discriminator": [
         64,
         104,
@@ -792,23 +758,14 @@
         },
         {
           "name": "vault_token_account",
-          "docs": [
-            "Vault-ATA (Owner = PDA)"
-          ],
           "writable": true
         },
         {
           "name": "user_dmd_ata",
-          "docs": [
-            "User-ATA"
-          ],
           "writable": true
         },
         {
           "name": "founder",
-          "docs": [
-            "Auszahlung 60/40"
-          ],
           "writable": true
         },
         {
@@ -915,16 +872,10 @@
           }
         },
         {
-          "name": "buyer",
-          "docs": [
-            "Der Buyer, dessen Whitelist-Status gesetzt wird"
-          ]
+          "name": "buyer"
         },
         {
           "name": "buyer_state",
-          "docs": [
-            "PDA: [b\"buyer\", vault, buyer] – wird bei Bedarf angelegt"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -951,9 +902,6 @@
         },
         {
           "name": "founder",
-          "docs": [
-            "Nur Founder darf whitelisten und zahlt ggf. die Miete"
-          ],
           "writable": true,
           "signer": true
         },

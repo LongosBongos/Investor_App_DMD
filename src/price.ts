@@ -1,19 +1,36 @@
 // src/price.ts
-// Robust: SOL/USD fetch + DMD Pricing V2
-// Features: Manual + (Weighted) Backing + Holder-Factor + MaxSupply/Preset Pool
 
 type Num = number;
-const TMO = 5000; // 5s Timeout pro Quelle
+const TMO = 5000;
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
-const okRange = (x: any): x is Num =>
+// ✅ SOL/USD plausibel
+const okSolUsd = (x: any): x is Num =>
   typeof x === "number" && isFinite(x) && x > 0.5 && x < 10000;
 
+// ✅ Token USD kann sehr klein sein
+const okTokenUsd = (x: any): x is Num =>
+  typeof x === "number" && isFinite(x) && x > 0 && x < 10000;
+
+// ------------------ Mini Cache / Anti-Spam ------------------
+let solUsdCache: { v: number; ts: number } | null = null;
+let solUsdInFlight: Promise<number> | null = null;
+
+const now = () => Date.now();
+const cacheOk = (ttlMs: number) =>
+  solUsdCache && now() - solUsdCache.ts < ttlMs && okSolUsd(solUsdCache.v);
+
+// ------------------ fetchJson ------------------
 async function fetchJson(url: string, init?: RequestInit, timeoutMs: number = TMO) {
   const ctrl = new AbortController();
   const id = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { ...init, signal: ctrl.signal, cache: "no-store", mode: "cors" });
+    const r = await fetch(url, {
+      ...init,
+      signal: ctrl.signal,
+      cache: "no-store",
+      mode: "cors",
+    });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
   } finally {
@@ -21,113 +38,237 @@ async function fetchJson(url: string, init?: RequestInit, timeoutMs: number = TM
   }
 }
 
-function logOK(source: string, v: Num) { console.log(`[price] ${source} OK -> $${v.toFixed(6)}`); }
+function logOK(source: string, v: Num) { console.log(`[price] ${source} OK -> ${v}`); }
 function logMISS(source: string, msg?: any) { console.warn(`[price] ${source} miss`, msg ?? ""); }
 
-export async function fetchSolUsd(): Promise<number> {
-  // 1) Jupiter v6
-  try {
-    const u = "https://price.jup.ag/v6/price?ids=SOL&_=" + Date.now();
-    const j: any = await fetchJson(u, { headers: { pragma: "no-cache", "cache-control": "no-cache" } });
-    const v = j?.data?.SOL?.price ?? j?.data?.SOL;
-    if (okRange(v)) { logOK("Jupiter v6", v); return v; }
-    logMISS("Jupiter v6 shape", j);
-  } catch (e) { logMISS("Jupiter v6 error", e); }
+// ===================== Backend-Helper =====================
+type BackendPrice = { solUsd: number; dmdUsd: number; dmdPerSol: number };
 
-  // 2) Jupiter v4
-  try {
-    const u = "https://price.jup.ag/v4/price?ids=SOL&_=" + Date.now();
-    const j: any = await fetchJson(u, { headers: { pragma: "no-cache", "cache-control": "no-cache" } });
-    const v = j?.data?.SOL?.price ?? j?.data?.SOL;
-    if (okRange(v)) { logOK("Jupiter v4", v); return v; }
-    logMISS("Jupiter v4 shape", j);
-  } catch (e) { logMISS("Jupiter v4 error", e); }
-
-  // 3) Pyth Hermes
-  try {
-    const u = "https://hermes.pyth.network/v2/price/latest?ids=Crypto.SOL%2FUSD&_=" + Date.now();
-    const j: any = await fetchJson(u);
-    const arr = j?.parsed ?? j?.data ?? null;
-    if (Array.isArray(arr) && arr.length) {
-      const pObj = arr[0];
-      if (pObj?.price && typeof pObj.price.price === "number") {
-        const expo = pObj.price.expo || 0;
-        const v = pObj.price.price * Math.pow(10, expo);
-        if (okRange(v)) { logOK("Pyth Hermes (expo)", v); return v; }
-      }
-      const v2 = pObj?.prices?.usd;
-      if (okRange(v2)) { logOK("Pyth Hermes (usd)", v2); return v2; }
-    }
-    logMISS("Pyth shape", j);
-  } catch (e) { logMISS("Pyth error", e); }
-
-  // 4) CoinGecko
-  try {
-    const u = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&_=" + Date.now();
-    const j: any = await fetchJson(u);
-    const v = j?.solana?.usd;
-    if (okRange(v)) { logOK("CoinGecko", v); return v; }
-    logMISS("CoinGecko shape", j);
-  } catch (e) { logMISS("CoinGecko error", e); }
-
-  // 5) CryptoCompare
-  try {
-    const u = "https://min-api.cryptocompare.com/data/price?fsym=SOL&tsyms=USD&_=" + Date.now();
-    const j: any = await fetchJson(u);
-    const v = j?.USD;
-    if (okRange(v)) { logOK("CryptoCompare", v); return v; }
-    logMISS("CryptoCompare shape", j);
-  } catch (e) { logMISS("CryptoCompare error", e); }
-
-  // 6) DEV-FALLBACK (.env)
-  try {
-    const env: any = (import.meta as any).env || {};
-    if (env.VITE_DEV_SOL_PRICE === "1") {
-      const v = Number(env.VITE_SOL_USD || "0");
-      if (okRange(v)) { logOK("DEV_FALLBACK", v); return v; }
-      logMISS("DEV_FALLBACK bad value", v);
-    }
-  } catch (e) { logMISS("DEV_FALLBACK error", e); }
-
-  logMISS("ALL SOURCES");
-  return 0;
+function getBackendBase(): string | null {
+  const env: any = (import.meta as any).env || {};
+  // ✅ Schalter: nur wenn Backend wirklich existiert
+  const enabled = String(env.VITE_BACKEND_PRICE || "").trim() === "1";
+  const base = String(env.VITE_BACKEND_URL || "").trim(); // z.B. https://dein-worker.xyz
+  if (!enabled && !base) return null;
+  return base || ""; // "" => same-origin (/api/price via proxy), base => absolute
 }
 
-/** ===== DMD Pricing V2 =====
- * Inputs (alle optional, aber sinnvoll für Autopricing):
- * - lamportsPer10k: u64 aus Vault (Manual-Preis pro 10k DMD)
- * - treasuryLamports: SOL im Treasury (Lamports)
- * - circulating: zirkulierende DMD (falls bekannt) – sonst wird (maxSupply - presalePool) verwendet
- * - maxSupply: Default 150_000_000
- * - manualFloorUsd: Mindestpreis pro DMD (z. B. 0.01)
- * - holders: Anzahl eindeutiger Token-Owner (Founder inkl., Vault/Treasury egal)
- * - presalePool: DMD, die im Presale-Pool liegen (nicht im Umlauf)
- * - treasuryWeight: Gewichtung des Backings (0..1; Default 1.0)
- */
+async function fetchBackendPrice(): Promise<BackendPrice | null> {
+  const base = getBackendBase();
+  if (base === null) return null; // ✅ verhindert HTML <!doctype> Fehler
+
+  try {
+    const url = `${base}/api/price`;
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+    // ✅ falls doch HTML kommt: abfangen
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      const txt = await r.text();
+      throw new Error(`Non-JSON response (${ct}): ${txt.slice(0, 40)}...`);
+    }
+
+    const j: any = await r.json();
+    const solUsd = Number(j.solUsd ?? 0);
+    const dmdUsd = Number(j.dmdUsd ?? 0);
+    const dmdPerSol = Number(j.dmdPerSol ?? 0);
+
+    if (okSolUsd(solUsd)) {
+      logOK("Backend /api/price solUsd", solUsd);
+      return { solUsd, dmdUsd, dmdPerSol };
+    }
+    logMISS("Backend /api/price shape", j);
+  } catch (e) {
+    logMISS("Backend /api/price error", e);
+  }
+  return null;
+}
+
+// ===================== Dexscreener Pair Price =====================
+export type DexPairPrice = {
+  dmdUsd: number | null;
+  dmdPerSol: number | null;
+  source: "dexscreener";
+};
+
+export async function fetchDexPair(pair: string): Promise<DexPairPrice | null> {
+  try {
+    const url = `https://api.dexscreener.com/latest/dex/pairs/solana/${pair}?_=${Date.now()}`;
+    const j: any = await fetchJson(url, { headers: { pragma: "no-cache", "cache-control": "no-cache" } });
+
+    const p = j?.pairs?.[0];
+    const priceUsd = Number(p?.priceUsd ?? 0);
+    const priceNative = Number(p?.priceNative ?? 0);
+
+    const dmdUsd = okTokenUsd(priceUsd) ? priceUsd : null;
+    const dmdPerSol = okTokenUsd(priceNative) ? priceNative : null;
+
+    if (dmdUsd != null) logOK("Dexscreener priceUsd", dmdUsd);
+    else logMISS("Dexscreener priceUsd missing", j);
+
+    return { dmdUsd, dmdPerSol, source: "dexscreener" };
+  } catch (e) {
+    logMISS("Dexscreener fetch error", e);
+    return null;
+  }
+}
+
+// ===================== fetchSolUsd =====================
+export async function fetchSolUsd(): Promise<number> {
+  // ✅ cache: 20s reicht in dev völlig, reduziert Spam massiv
+  if (cacheOk(20_000)) return solUsdCache!.v;
+  if (solUsdInFlight) return solUsdInFlight;
+
+  solUsdInFlight = (async () => {
+    // 0) Backend /api/price (nur wenn enabled)
+    const backend = await fetchBackendPrice();
+    if (backend && okSolUsd(backend.solUsd)) {
+      solUsdCache = { v: backend.solUsd, ts: now() };
+      solUsdInFlight = null;
+      return backend.solUsd;
+    }
+
+    // 1) CryptoCompare FIRST (bei dir funktioniert es zuverlässig)
+    try {
+      const u = "https://min-api.cryptocompare.com/data/price?fsym=SOL&tsyms=USD&_=" + Date.now();
+      const j: any = await fetchJson(u);
+      const v = j?.USD;
+      if (okSolUsd(v)) {
+        logOK("CryptoCompare", v);
+        solUsdCache = { v, ts: now() };
+        solUsdInFlight = null;
+        return v;
+      }
+      logMISS("CryptoCompare shape", j);
+    } catch (e) { logMISS("CryptoCompare error", e); }
+
+    // 2) Jupiter v6 (optional)
+    try {
+      const u = "https://price.jup.ag/v6/price?ids=SOL&_=" + Date.now();
+      const j: any = await fetchJson(u, { headers: { pragma: "no-cache", "cache-control": "no-cache" } });
+      const v = j?.data?.SOL?.price ?? j?.data?.SOL;
+      if (okSolUsd(v)) {
+        logOK("Jupiter v6", v);
+        solUsdCache = { v, ts: now() };
+        solUsdInFlight = null;
+        return v;
+      }
+      logMISS("Jupiter v6 shape", j);
+    } catch (e) { logMISS("Jupiter v6 error", e); }
+
+    // 3) Jupiter v4 (optional)
+    try {
+      const u = "https://price.jup.ag/v4/price?ids=SOL&_=" + Date.now();
+      const j: any = await fetchJson(u, { headers: { pragma: "no-cache", "cache-control": "no-cache" } });
+      const v = j?.data?.SOL?.price ?? j?.data?.SOL;
+      if (okSolUsd(v)) {
+        logOK("Jupiter v4", v);
+        solUsdCache = { v, ts: now() };
+        solUsdInFlight = null;
+        return v;
+      }
+      logMISS("Jupiter v4 shape", j);
+    } catch (e) { logMISS("Jupiter v4 error", e); }
+
+    // 4) Pyth Hermes (nur wenn ID gesetzt)
+    try {
+      const env: any = (import.meta as any).env || {};
+      const pythId = String(env.VITE_PYTH_SOL_USD_ID || "").trim(); // z.B. hex feed id
+      if (pythId) {
+        const u = `https://hermes.pyth.network/v2/updates/price/latest?ids[]=${encodeURIComponent(pythId)}&_=${Date.now()}`;
+        const j: any = await fetchJson(u);
+        const p = j?.parsed?.[0]?.price;
+        if (p && typeof p.price === "number") {
+          const expo = p.expo || 0;
+          const v = p.price * Math.pow(10, expo);
+          if (okSolUsd(v)) {
+            logOK("Pyth Hermes", v);
+            solUsdCache = { v, ts: now() };
+            solUsdInFlight = null;
+            return v;
+          }
+        }
+        logMISS("Pyth shape", j);
+      }
+    } catch (e) { logMISS("Pyth error", e); }
+
+    // 5) CoinGecko (nur wenn ausdrücklich erlaubt)
+    try {
+      const env: any = (import.meta as any).env || {};
+      if (String(env.VITE_ALLOW_COINGECKO || "").trim() === "1") {
+        const u = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&_=" + Date.now();
+        const j: any = await fetchJson(u);
+        const v = j?.solana?.usd;
+        if (okSolUsd(v)) {
+          logOK("CoinGecko", v);
+          solUsdCache = { v, ts: now() };
+          solUsdInFlight = null;
+          return v;
+        }
+        logMISS("CoinGecko shape", j);
+      }
+    } catch (e) { logMISS("CoinGecko error", e); }
+
+    // 6) DEV-FALLBACK
+    try {
+      const env: any = (import.meta as any).env || {};
+      if (env.VITE_DEV_SOL_PRICE === "1") {
+        const v = Number(env.VITE_SOL_USD || "0");
+        if (okSolUsd(v)) {
+          logOK("DEV_FALLBACK", v);
+          solUsdCache = { v, ts: now() };
+          solUsdInFlight = null;
+          return v;
+        }
+        logMISS("DEV_FALLBACK bad value", v);
+      }
+    } catch (e) { logMISS("DEV_FALLBACK error", e); }
+
+    logMISS("ALL SOL SOURCES");
+    solUsdInFlight = null;
+    return 0;
+  })();
+
+  return solUsdInFlight;
+}
+
+/** ===== DMD Pricing V2 ===== */
 export type DmdPricingInput = {
-  lamportsPer10k?: number;      // z. B. aus Vault.initial_price_sol (Lamports pro 10k)
-  treasuryLamports?: number;    // getBalance(TREASURY) in Lamports
-  circulating?: number;         // (optional) zirkulierende DMD
-  maxSupply?: number;           // Default 150 Mio
-  manualFloorUsd?: number;      // Default $0.01
-  holders?: number;             // ✅ neu
-  presalePool?: number;         // ✅ neu (DMD im Presale/Vault-Pool)
-  treasuryWeight?: number;      // ✅ neu (0..1)
+  lamportsPer10k?: number;
+  treasuryLamports?: number;
+  circulating?: number;
+  maxSupply?: number;
+  manualFloorUsd?: number;
+  holders?: number;
+  presalePool?: number;
+  treasuryWeight?: number;
+  dexPair?: string;
 };
 
 export type DmdPricing = {
   solUsd: number;
   usdPerDmdManual: number | null;
-  usdPerDmdBacking: number | null;          // ungewichtet
-  usdPerDmdBackingWeighted: number | null;  // mit treasuryWeight wT
-  usdPerDmdFinal: number | null;            // max(Floor, Manual, wT*Backing) * HolderFactor
-  holderFactor: number;                     // 0.98 .. 1.08
+  usdPerDmdBacking: number | null;
+  usdPerDmdBackingWeighted: number | null;
+  usdPerDmdDex: number | null;
+  usdPerDmdFinal: number | null;
+  holderFactor: number;
   notes: string[];
 };
 
 export async function computeDmdPricing(input: DmdPricingInput = {}): Promise<DmdPricing> {
   const notes: string[] = [];
-  const solUsd = await fetchSolUsd();
+
+  const backend = await fetchBackendPrice();
+  const solUsd = backend?.solUsd ?? (await fetchSolUsd());
+
+  let dexUsd: number | null = null;
+  if (input.dexPair) {
+    const dex = await fetchDexPair(input.dexPair);
+    dexUsd = dex?.dmdUsd ?? null;
+    if (dexUsd != null) notes.push(`Dexscreener dmdUsd=${dexUsd.toFixed(8)}`);
+  }
 
   const maxSupply = input.maxSupply ?? 150_000_000;
   const floor = input.manualFloorUsd ?? 0.01;
@@ -135,34 +276,30 @@ export async function computeDmdPricing(input: DmdPricingInput = {}): Promise<Dm
   const holders = Math.max(0, Math.floor(input.holders ?? 0));
   const presale = Math.max(0, Math.floor(input.presalePool ?? 0));
 
-  // Holder-Faktor: sanfter Bias 0.98 .. 1.08
   const holderFactor = (() => {
     const raw = 0.98 + 0.02 * Math.log10(holders + 1);
     return Math.max(0.98, Math.min(1.08, raw));
   })();
   if (holders) notes.push(`Holders=${holders} → fH=${holderFactor.toFixed(4)}`);
 
-  // Manual: (lamports/10k) -> SOL/10k -> USD/10k -> /10000
   let usdPerDmdManual: number | null = null;
   if (typeof input.lamportsPer10k === "number" && solUsd > 0) {
     const solPer10k = input.lamportsPer10k / LAMPORTS_PER_SOL;
     usdPerDmdManual = (solPer10k * solUsd) / 10_000;
-    notes.push(`Manual via lamports_per_10k -> ${usdPerDmdManual.toFixed(8)} USD/DMD`);
+    notes.push(`Manual -> ${usdPerDmdManual.toFixed(8)} USD/DMD`);
   } else {
-    notes.push("Manual Preis nicht berechnet (fehlende lamportsPer10k oder solUsd==0).");
+    notes.push("Manual Preis nicht berechnet.");
   }
 
-  // Circulating: bevorzugt 'input.circulating', sonst (maxSupply - presalePool)
   let circulating = 0;
   if (typeof input.circulating === "number" && isFinite(input.circulating) && input.circulating > 0) {
     circulating = Math.floor(input.circulating);
-    notes.push(`Circulating (override) = ${circulating.toLocaleString()}`);
+    notes.push(`Circulating (override)=${circulating.toLocaleString()}`);
   } else {
-    circulating = Math.max(1, Math.floor(maxSupply - presale)); // mind. 1, um Div/0 zu vermeiden
-    notes.push(`Circulating (calc) = maxSupply(${maxSupply.toLocaleString()}) - presalePool(${presale.toLocaleString()}) = ${circulating.toLocaleString()}`);
+    circulating = Math.max(1, Math.floor(maxSupply - presale));
+    notes.push(`Circulating (calc)=${circulating.toLocaleString()}`);
   }
 
-  // Backing: Treasury_USD / circulating
   let usdPerDmdBacking: number | null = null;
   let usdPerDmdBackingWeighted: number | null = null;
   if (typeof input.treasuryLamports === "number" && solUsd > 0 && circulating > 0) {
@@ -170,23 +307,30 @@ export async function computeDmdPricing(input: DmdPricingInput = {}): Promise<Dm
     const trezUsd = trezSol * solUsd;
     usdPerDmdBacking = trezUsd / circulating;
     usdPerDmdBackingWeighted = usdPerDmdBacking * wT;
-    notes.push(`Backing = TreasuryUSD(${trezUsd.toFixed(2)}) / circulating(${circulating.toLocaleString()}) -> ${usdPerDmdBacking.toFixed(8)} USD/DMD; wT=${wT.toFixed(2)} → ${usdPerDmdBackingWeighted.toFixed(8)}`);
+    notes.push(`Backing=${usdPerDmdBacking.toFixed(10)} wT=${wT.toFixed(2)} -> ${usdPerDmdBackingWeighted.toFixed(10)}`);
   } else {
-    notes.push("Backing nicht berechnet (treasuryLamports/solUsd fehlen).");
+    notes.push("Backing nicht berechnet.");
   }
 
-  // Final vor Holder-Bias: max(Floor, Manual, WeightedBacking)
+  let backendDmdUsd: number | null = null;
+  if (backend && okTokenUsd(backend.dmdUsd)) {
+    backendDmdUsd = backend.dmdUsd;
+    notes.push(`Backend dmdUsd=${backendDmdUsd.toFixed(8)}`);
+  }
+
   const candBase = [
     floor,
     usdPerDmdManual ?? 0,
     usdPerDmdBackingWeighted ?? 0,
+    backendDmdUsd ?? 0,
+    dexUsd ?? 0,
   ].filter((x) => typeof x === "number" && x > 0);
 
   let usdPerDmdFinal: number | null = null;
   if (candBase.length) {
     const base = Math.max(...candBase);
     usdPerDmdFinal = base * holderFactor;
-    notes.push(`Base = max(Floor=${floor.toFixed(4)}, Manual, wT*Backing) -> ${base.toFixed(8)} ; Final = Base * fH(${holderFactor.toFixed(4)}) -> ${usdPerDmdFinal.toFixed(8)} USD/DMD`);
+    notes.push(`Final: base=${base.toFixed(8)} * fH=${holderFactor.toFixed(4)} => ${usdPerDmdFinal.toFixed(8)}`);
   } else {
     notes.push("Kein finaler Preis – alle Quellen leer.");
   }
@@ -196,6 +340,7 @@ export async function computeDmdPricing(input: DmdPricingInput = {}): Promise<Dm
     usdPerDmdManual,
     usdPerDmdBacking,
     usdPerDmdBackingWeighted,
+    usdPerDmdDex: dexUsd,
     usdPerDmdFinal,
     holderFactor,
     notes,

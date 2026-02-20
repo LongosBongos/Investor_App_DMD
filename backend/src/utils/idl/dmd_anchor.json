@@ -1,0 +1,1075 @@
+{
+  "address": "EDY4bp4fXWkAJpJhXUMZLL7fjpDhpKZQFPpygzsTMzro",
+  "metadata": {
+    "name": "dmd_anchor",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "auto_whitelist_self",
+      "discriminator": [
+        58,
+        140,
+        157,
+        210,
+        236,
+        85,
+        159,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "buy_dmd",
+      "discriminator": [
+        118,
+        112,
+        238,
+        202,
+        214,
+        39,
+        149,
+        203
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "founder",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "buyer_token_account",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sol_contribution",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim_reward",
+      "discriminator": [
+        149,
+        95,
+        181,
+        242,
+        94,
+        90,
+        158,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_reward_v2",
+      "discriminator": [
+        0,
+        178,
+        84,
+        58,
+        172,
+        64,
+        185,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "buyer_token_account",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "founder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "founder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "founder_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "initial_price_sol",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "sell_dmd",
+      "discriminator": [
+        129,
+        244,
+        102,
+        89,
+        109,
+        152,
+        241,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "sell_dmd_v2",
+      "discriminator": [
+        84,
+        193,
+        171,
+        169,
+        74,
+        251,
+        221,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "buyer_token_account",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "founder",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_tokens",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_manual_price",
+      "discriminator": [
+        6,
+        210,
+        4,
+        51,
+        43,
+        53,
+        139,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "founder",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports_per_10k",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "swap_exact_dmd_for_sol",
+      "discriminator": [
+        207,
+        148,
+        8,
+        253,
+        245,
+        84,
+        97,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_dmd_ata",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "founder",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in_dmd",
+          "type": "u64"
+        },
+        {
+          "name": "min_out_sol",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "swap_exact_sol_for_dmd",
+      "discriminator": [
+        64,
+        104,
+        47,
+        179,
+        12,
+        0,
+        23,
+        147
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_dmd_ata",
+          "writable": true
+        },
+        {
+          "name": "founder",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "min_out_dmd",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "toggle_public_sale",
+      "discriminator": [
+        48,
+        110,
+        255,
+        143,
+        126,
+        24,
+        42,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "founder",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "active",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "whitelist_add",
+      "discriminator": [
+        200,
+        159,
+        194,
+        141,
+        100,
+        114,
+        107,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer"
+        },
+        {
+          "name": "buyer_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "founder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BuyerState",
+      "discriminator": [
+        196,
+        226,
+        50,
+        172,
+        9,
+        123,
+        201,
+        250
+      ]
+    },
+    {
+      "name": "Vault",
+      "discriminator": [
+        211,
+        8,
+        232,
+        43,
+        2,
+        152,
+        117,
+        119
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NotWhitelisted",
+      "msg": "Du bist nicht auf der Whitelist."
+    },
+    {
+      "code": 6001,
+      "name": "ClaimTooEarly",
+      "msg": "Claim zu früh."
+    },
+    {
+      "code": 6002,
+      "name": "SellTooEarly",
+      "msg": "Zu früh verkauft."
+    },
+    {
+      "code": 6003,
+      "name": "HoldTooShort",
+      "msg": "Nicht lange genug gehalten."
+    },
+    {
+      "code": 6004,
+      "name": "PresaleLimitReached",
+      "msg": "Presale Limit erreicht."
+    },
+    {
+      "code": 6005,
+      "name": "Unauthorized",
+      "msg": "Nicht berechtigt."
+    },
+    {
+      "code": 6006,
+      "name": "InsufficientFounderInit",
+      "msg": "Founder Initialisierung zu niedrig."
+    },
+    {
+      "code": 6007,
+      "name": "MathOverflow",
+      "msg": "Arithmetischer Überlauf."
+    },
+    {
+      "code": 6008,
+      "name": "ContributionOutOfRange",
+      "msg": "Beitrag außerhalb des erlaubten Bereichs (0.5–10 SOL)."
+    },
+    {
+      "code": 6009,
+      "name": "InvalidPrice",
+      "msg": "Ungültiger Preis."
+    }
+  ],
+  "types": [
+    {
+      "name": "BuyerState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "total_dmd",
+            "type": "u64"
+          },
+          {
+            "name": "last_reward_claim",
+            "type": "i64"
+          },
+          {
+            "name": "last_sell",
+            "type": "i64"
+          },
+          {
+            "name": "holding_since",
+            "type": "i64"
+          },
+          {
+            "name": "last_buy_day",
+            "type": "i64"
+          },
+          {
+            "name": "buy_count_today",
+            "type": "u64"
+          },
+          {
+            "name": "whitelisted",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Vault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_supply",
+            "type": "u64"
+          },
+          {
+            "name": "presale_sold",
+            "type": "u64"
+          },
+          {
+            "name": "initial_price_sol",
+            "type": "u64"
+          },
+          {
+            "name": "public_sale_active",
+            "type": "bool"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint_decimals",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

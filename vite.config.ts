@@ -1,14 +1,23 @@
 // vite.config.ts
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
-// Repo-Name exakt wie bei GitHub (Groß/Klein!)
 const BASE = "/Investor_App_DMD/";
 
 export default defineConfig(({ command }) => ({
-  // Dev (serve) => "/"   ·   Build/Pages (build) => "/Investor_App_DMD/"
   base: command === "serve" ? "/" : BASE,
-  plugins: [react()],
+  plugins: [
+    react(),
+    nodePolyfills({
+      protocolImports: true,
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+    }),
+  ],
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 1600,
@@ -22,7 +31,10 @@ export default defineConfig(({ command }) => ({
   },
   define: {
     "process.env": {},
-    global: "window",
+    global: "globalThis",
+  },
+  optimizeDeps: {
+    include: ["buffer", "process"],
   },
   server: {
     port: 5173,

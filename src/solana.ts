@@ -6,25 +6,32 @@ import {
 } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 
-// Buffer-Polyfill
-import { Buffer } from "buffer";
-if (typeof window !== "undefined" && !(window as any).Buffer) {
-  (window as any).Buffer = Buffer;
+// Buffer-Polyfill (Vite-safe)
+// IMPORTANT: Vite still needs buffer in optimizeDeps/alias (see vite.config.ts).
+import { Buffer as BufferPolyfill } from "buffer";
+
+// Attach Buffer to window/globalThis once (browser)
+if (typeof globalThis !== "undefined" && !(globalThis as any).Buffer) {
+  (globalThis as any).Buffer = BufferPolyfill;
 }
+const Buffer = (globalThis as any).Buffer as typeof BufferPolyfill;
 
 /** ================== Konstanten (ENV-first, mit Fallback) ================== **/
 export const PROGRAM_ID = new PublicKey(
   import.meta.env.VITE_PROGRAM_ID ??
     "EDY4bp4fXWkAJpJhXUMZLL7fjpDhpKZQFPpygzsTMzro"
 );
+
 export const DMD_MINT = new PublicKey(
   import.meta.env.VITE_DMD_MINT ??
     "3rCZT3Xw6jvU4JWatQPsivS8fQ7gV7GjUfJnbTk9Ssn5"
 );
+
 export const TREASURY = new PublicKey(
   import.meta.env.VITE_TREASURY ??
     "CEUmazdgtbUCcQyLq6NCm4BuQbvCsYFzKsS5wdRvZehV"
 );
+
 export const FOUNDER = new PublicKey(
   import.meta.env.VITE_FOUNDER ??
     "AqPFb5LWQuzKiyoKTX9XgUwsYWoFvpeE8E8uzQvnDTzT"
@@ -40,10 +47,12 @@ export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
 
 /** ================== PDA Helpers ================== **/
 const u8 = anchor.utils.bytes.utf8;
+
 export function findVaultPda(): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync([u8.encode("vault")], PROGRAM_ID);
   return pda;
 }
+
 export function findBuyerStatePda(vault: PublicKey, buyer: PublicKey): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
     [u8.encode("buyer"), vault.toBuffer(), buyer.toBuffer()],
@@ -60,19 +69,24 @@ export function ataFor(owner: PublicKey, mint: PublicKey = DMD_MINT): PublicKey 
   );
   return ata;
 }
+
 export const vaultAta = (vault: PublicKey) => ataFor(vault, DMD_MINT);
 export const buyerAta = (buyer: PublicKey) => ataFor(buyer, DMD_MINT);
 
 /** ================== Coder & Utils ================== **/
 export const buildIxCoder = (idl: anchor.Idl) =>
   new anchor.BorshInstructionCoder(idl);
+
 export const buildAccCoder = (idl: anchor.Idl) =>
   new anchor.BorshAccountsCoder(idl);
+
 export const bn = (x: number | string | bigint) => new anchor.BN(x);
 
 export const LAMPORTS_PER_SOL = anchor.web3.LAMPORTS_PER_SOL;
+
 export const solToLamports = (sol: number) =>
   Math.floor(Number(sol) * LAMPORTS_PER_SOL);
+
 export const lamportsToSol = (lamports: number) =>
   Number(lamports) / LAMPORTS_PER_SOL;
 

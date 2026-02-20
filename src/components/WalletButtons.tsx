@@ -11,6 +11,7 @@ export const WalletButtons: React.FC = () => {
     disconnect,
     connected,
     connecting,
+    publicKey,
   }: WalletContextState = useWallet();
 
   // Map Wallets nach Namen
@@ -28,36 +29,40 @@ export const WalletButtons: React.FC = () => {
     await connect();
   };
 
-  // Angemeldet → Disconnect-UI
-  if (connected) {
-    return (
-      <div className="walletbar">
-        <span className="chip">
-          {wallet?.adapter.name ?? "Wallet"} verbunden
-        </span>
-        <button className="btn" onClick={disconnect}>
-          Disconnect
-        </button>
-      </div>
-    );
-  }
-
-  // Nicht angemeldet → Connect-Buttons
   const supportedWallets = ["Phantom", "Solflare", "Ledger", "Torus"];
 
+  // PublicKey kurz anzeigen
+  const shortKey = useMemo(() => {
+    const s = publicKey?.toBase58();
+    if (!s) return "";
+    return `${s.slice(0, 4)}…${s.slice(-4)}`;
+  }, [publicKey]);
+
   return (
-    <div className="walletbar">
-      {supportedWallets.map((name) => (
-        <button
-          key={name}
-          className="btn"
-          disabled={connecting}
-          onClick={() => handleClick(name)}
-        >
-          Connect {name}
-        </button>
-      ))}
+    <div className="wallet-slot" role="navigation" aria-label="Wallet">
+      {connected ? (
+        <div className="walletbar walletbar--connected">
+          <span className="wallet-chip">
+            {wallet?.adapter.name ?? "Wallet"} · {shortKey || "verbunden"}
+          </span>
+          <button className="wallet-elite-btn" onClick={disconnect}>
+            Disconnect
+          </button>
+        </div>
+      ) : (
+        <div className="walletbar">
+          {supportedWallets.map((name) => (
+            <button
+              key={name}
+              className="wallet-elite-btn"
+              disabled={connecting}
+              onClick={() => handleClick(name)}
+            >
+              {connecting ? "Connecting…" : `Connect ${name}`}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
-
