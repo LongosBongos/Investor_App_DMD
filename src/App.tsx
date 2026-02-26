@@ -68,7 +68,7 @@ interface ImportMetaEnv {
 
   // ✅ optional backend controls (GH Pages safe)
   readonly VITE_BACKEND_ENABLED?: string; // "1" to enable
-  readonly VITE_BACKEND_URL?: string;     // e.g. https://your-backend.tld
+  readonly VITE_BACKEND_URL?: string; // e.g. https://your-backend.tld
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;
@@ -193,6 +193,23 @@ function toFeedRows(x: unknown): FeedRow[] {
   return out;
 }
 
+function fmtUsd(x: number): string {
+  if (!Number.isFinite(x)) return "—";
+  return x.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+function fmtCountdown(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return d > 0
+    ? `${d}d ${pad(h)}:${pad(m)}:${pad(ss)}`
+    : `${pad(h)}:${pad(m)}:${pad(ss)}`;
+}
+
 // -------------------------
 // Types
 // -------------------------
@@ -213,6 +230,7 @@ function NavBar(props: { active: Tab; setActive: (t: Tab) => void }) {
 
   return (
     <nav
+      className="tab-nav"
       style={{
         display: "flex",
         gap: 20,
@@ -225,6 +243,7 @@ function NavBar(props: { active: Tab; setActive: (t: Tab) => void }) {
         <button
           key={t}
           onClick={() => props.setActive(t)}
+          className={props.active === t ? "active" : ""}
           style={{
             padding: "10px 18px",
             borderRadius: 12,
@@ -247,14 +266,19 @@ function NavBar(props: { active: Tab; setActive: (t: Tab) => void }) {
 // =============================================================
 function UIWrapper() {
   const [page, setPage] = useState<Tab>("Dashboard");
+  const wallet = useWallet();
+  const connected = Boolean(wallet.publicKey);
 
   return (
     <>
       <WelcomeOverlay />
 
-      <div style={{ position: "fixed", top: 16, right: 16, zIndex: 50 }}>
-        <WalletMultiButton />
-      </div>
+      {/* ✅ Bottom-Center Wallet Connect (nur wenn NICHT verbunden) */}
+      {!connected && (
+        <div className="wallet-connect-bottom">
+          <WalletMultiButton />
+        </div>
+      )}
 
       <NavBar active={page} setActive={setPage} />
 
@@ -439,7 +463,11 @@ function DashboardPage() {
       </div>
 
       <div style={{ marginTop: 40 }}>
-        <TokenDistribution vault={vaultDmd} treasury={treasurySol} founder={founderDmd} />
+        <TokenDistribution
+          vault={vaultDmd}
+          treasury={treasurySol}
+          founder={founderDmd}
+        />
       </div>
 
       <div style={{ marginTop: 40 }}>
@@ -485,6 +513,34 @@ function TradingPage() {
   const [priceLamports10k, setPriceLamports10k] = useState<number | null>(null);
   const [vaultDmd, setVaultDmd] = useState<number | null>(null);
 
+  // NEW: wallet DMD balance + market price + timer
+  const [walletDmd, setWalletDmd] = useState<number>(0);
+  const [dmdMarketUsd, setDmdMarketUsd] = useState<number>(0);
+  const [nowTs, setNowTs] = useState<number>(() => Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    const iv = window.setInterval(() => setNowTs(Math.floor(Date.now() / 1000)), 1000);
+    return () => window.clearInterval(iv);
+  }, []);
+
+  const claimView = useMemo(() => {
+    if (!buyerState) return { ok: false, text: "—" };
+
+    const holdSince = readNumberField(buyerState, "holding_since") ?? 0;
+    const lastClaim = readNumberField(buyerState, "last_reward_claim") ?? 0;
+
+    const holdReadyAt = holdSince > 0 ? holdSince + HOLD_DURATION_SEC : 0;
+    const intervalReadyAt = lastClaim > 0 ? lastClaim + CLAIM_INTERVAL_SEC : 0;
+
+    const readyAt = Math.max(holdReadyAt, intervalReadyAt);
+    if (readyAt <= 0) return { ok: false, text: "—" };
+
+    const left = readyAt - nowTs;
+    const ok = left <= 0;
+
+    return { ok, text: ok ? "✅ Claim verfügbar" : `⏳ Claim in ${fmtCountdown(left)}` };
+  }, [buyerState, nowTs]);
+
   useEffect(() => {
     let alive = true;
 
@@ -494,6 +550,18 @@ function TradingPage() {
       try {
         const vault = findVaultPda();
         const bs = findBuyerStatePda(vault, wallet.publicKey);
+
+        // Dex Market price (USD)
+        const market = await fetchDmdUsdFromDex(DEX_PAIR).catch(() => 0);
+        if (alive && market > 0) setDmdMarketUsd(market);
+
+        // Wallet DMD balance
+        const buyerAta = ataOf(wallet.publicKey, DMD_MINT);
+        const bBal = await connection
+          .getTokenAccountBalance(buyerAta)
+          .then((r) => Number(r.value.uiAmount ?? 0))
+          .catch(() => 0);
+        if (alive) setWalletDmd(bBal);
 
         const ai = await connection.getAccountInfo(bs).catch(() => null);
         if (!alive) return;
@@ -724,13 +792,53 @@ function TradingPage() {
       {!connected && (
         <div className="panel" style={{ textAlign: "center", padding: 20 }}>
           <div className="panel-title">Wallet verbinden</div>
-          <p className="small muted">Verbinde deine Wallet, um DMD handeln zu können.</p>
-          <WalletMultiButton />
+          <p className="small muted">
+            Verbinde deine Wallet über den Button unten, um DMD handeln zu können.
+          </p>
         </div>
       )}
 
       {connected && (
         <>
+          <div className="panel" style={{ marginBottom: 20 }}>
+            <div className="panel-title">Wallet Overview</div>
+
+            <div className="kv">
+              <span>Dein DMD</span>
+              <b>{walletDmd.toLocaleString()}</b>
+            </div>
+
+            <div className="kv">
+              <span>DMD Market (Dex)</span>
+              <b>{dmdMarketUsd > 0 ? `$${dmdMarketUsd.toFixed(6)}` : "—"}</b>
+            </div>
+
+            <div className="kv">
+              <span>Wert deiner DMD (Dex)</span>
+              <b>{dmdMarketUsd > 0 ? fmtUsd(walletDmd * dmdMarketUsd) : "—"}</b>
+            </div>
+
+            <div className="kv" style={{ marginTop: 8 }}>
+              <span>Claim Counter</span>
+              <b style={{ color: claimView.ok ? "#14f195" : undefined }}>
+                {claimView.text}
+              </b>
+            </div>
+
+            <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
+              Hinweis: Der Counter basiert on-chain auf deinem BuyerState (holding_since / last_reward_claim).
+              Maßgeblich ist die Blockchain.
+            </div>
+          </div>
+
+          <div className="panel" style={{ marginBottom: 20 }}>
+            <div className="panel-title">Trading Hinweis</div>
+            <div className="small" style={{ lineHeight: 1.6 }}>
+              <b>Verkauf (Sell) wird vorläufig über Phantom/DEX gesteuert</b> – nicht über die DMD App,
+              falls Bedarf besteht. Dadurch bleibt der Flow stabil und sicher im Walletbrowser.
+            </div>
+          </div>
+
           {!whitelisted && (
             <div className="panel" style={{ marginBottom: 20 }}>
               <div className="panel-title">Whitelist</div>
@@ -746,32 +854,61 @@ function TradingPage() {
               <div className="panel">
                 <div className="panel-title">SOL → DMD</div>
                 <label className="small muted">SOL</label>
-                <input className="input" value={amountSol} onChange={(e) => setAmountSol(e.target.value)} />
+                <input
+                  className="input"
+                  value={amountSol}
+                  onChange={(e) => setAmountSol(e.target.value)}
+                />
 
                 <label className="small muted" style={{ marginTop: 10 }}>
                   Slippage (%)
                 </label>
-                <input className="input input--sm" value={slippagePct} onChange={(e) => setSlippagePct(e.target.value)} />
+                <input
+                  className="input input--sm"
+                  value={slippagePct}
+                  onChange={(e) => setSlippagePct(e.target.value)}
+                />
 
                 <div className="btn-grid" style={{ marginTop: 15 }}>
-                  <button className="action-btn" onClick={handleBuy}>BUY DMD</button>
-                  <button className="action-btn swap-btn" onClick={handleSwapSolToDmd}>SWAP SOL→DMD</button>
+                  <button className="action-btn" onClick={handleBuy}>
+                    BUY DMD
+                  </button>
+                  <button className="action-btn swap-btn" onClick={handleSwapSolToDmd}>
+                    SWAP SOL→DMD
+                  </button>
                 </div>
               </div>
 
               <div className="panel">
                 <div className="panel-title">DMD → SOL</div>
                 <label className="small muted">DMD</label>
-                <input className="input" value={amountDmd} onChange={(e) => setAmountDmd(e.target.value)} />
+                <input
+                  className="input"
+                  value={amountDmd}
+                  onChange={(e) => setAmountDmd(e.target.value)}
+                />
 
                 <label className="small muted" style={{ marginTop: 10 }}>
                   Slippage (%)
                 </label>
-                <input className="input input--sm" value={slippagePct} onChange={(e) => setSlippagePct(e.target.value)} />
+                <input
+                  className="input input--sm"
+                  value={slippagePct}
+                  onChange={(e) => setSlippagePct(e.target.value)}
+                />
 
                 <div className="btn-grid" style={{ marginTop: 15 }}>
-                  <button className="action-btn swap-btn" onClick={handleSwapDmdToSol}>SWAP DMD→SOL</button>
-                  <button className="action-btn" onClick={handleClaim}>CLAIM</button>
+                  <button className="action-btn swap-btn" onClick={handleSwapDmdToSol}>
+                    SWAP DMD→SOL
+                  </button>
+                  <button
+                    className="action-btn"
+                    onClick={handleClaim}
+                    disabled={!claimView.ok}
+                    title={!claimView.ok ? "Noch nicht verfügbar" : "Claim verfügbar"}
+                  >
+                    CLAIM
+                  </button>
                 </div>
               </div>
             </div>
@@ -803,8 +940,7 @@ function ForumPage() {
 
       {!connected && (
         <div className="panel" style={{ padding: 20 }}>
-          <p className="small muted">Bitte Wallet verbinden.</p>
-          <WalletMultiButton />
+          <p className="small muted">Bitte Wallet verbinden (Button unten).</p>
         </div>
       )}
 
@@ -852,8 +988,7 @@ function AirdropPage() {
 
       {!connected && (
         <div className="panel" style={{ padding: 20 }}>
-          <p className="small muted">Bitte Wallet verbinden.</p>
-          <WalletMultiButton />
+          <p className="small muted">Bitte Wallet verbinden (Button unten).</p>
         </div>
       )}
 
