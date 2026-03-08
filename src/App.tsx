@@ -273,9 +273,41 @@ function UIWrapper() {
     <>
       <WelcomeOverlay />
 
+      {/* ✅ PATCH: Scoped override so your global ".wallet-adapter-dropdown{position:fixed;top/right}" DOES NOT move this bottom button */}
+      <style>{`
+        .wallet-connect-bottom .wallet-adapter-dropdown {
+          position: static !important;
+          top: auto !important;
+          right: auto !important;
+          left: auto !important;
+          bottom: auto !important;
+        }
+        .wallet-connect-bottom .wallet-adapter-button-trigger,
+        .wallet-connect-bottom .wallet-adapter-button {
+          position: static !important;
+          top: auto !important;
+          right: auto !important;
+          left: auto !important;
+          bottom: auto !important;
+        }
+      `}</style>
+
       {/* ✅ Bottom-Center Wallet Connect (nur wenn NICHT verbunden) */}
       {!connected && (
-        <div className="wallet-connect-bottom">
+        <div
+          className="wallet-connect-bottom"
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: 22,
+            transform: "translateX(-50%)",
+            zIndex: 2147483647,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            pointerEvents: "auto",
+          }}
+        >
           <WalletMultiButton />
         </div>
       )}
@@ -453,7 +485,9 @@ function DashboardPage() {
 
         <div className="card p-md">
           <div className="card-title">DMD App Value (USD)</div>
-          <div className="card-value">{dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}</div>
+          <div className="card-value">
+            {dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}
+          </div>
         </div>
 
         <div className="card p-md">

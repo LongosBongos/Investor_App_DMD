@@ -38,10 +38,26 @@ export const WalletButtons: React.FC = () => {
     return `${s.slice(0, 4)}…${s.slice(-4)}`;
   }, [publicKey]);
 
+  // ✅ PATCH: Hard-center (unabhängig von CSS)
+  const slotStyle: React.CSSProperties = {
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+  };
+
+  const barStyle: React.CSSProperties = {
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  };
+
   return (
-    <div className="wallet-slot" role="navigation" aria-label="Wallet">
+    <div className="wallet-slot" role="navigation" aria-label="Wallet" style={slotStyle}>
       {connected ? (
-        <div className="walletbar walletbar--connected">
+        <div className="walletbar walletbar--connected" style={barStyle}>
           <span className="wallet-chip">
             {wallet?.adapter.name ?? "Wallet"} · {shortKey || "verbunden"}
           </span>
@@ -50,7 +66,7 @@ export const WalletButtons: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="walletbar">
+        <div className="walletbar" style={barStyle}>
           {supportedWallets.map((name) => (
             <button
               key={name}
