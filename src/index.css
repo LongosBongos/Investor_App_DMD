@@ -5,6 +5,7 @@
    - Kein Overflow / kein 100vh-WebView-Bug
    - Wallet Connect immer über allem (z-index)
    - NEW: Bottom-Center Wallet Connect (nur wenn NICHT verbunden)
+   - FIX: Header / Socials / Navbar Layout-Shift entfernt
    ============================================================ */
 
 :root {
@@ -40,7 +41,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   min-height: 100%;
@@ -86,7 +88,8 @@ body::before {
 /* ===== Header (Institution / App-Topbar) ===== */
 
 header {
-  padding: calc(14px + var(--safe-top)) 20px 10px;
+  padding: calc(14px + var(--safe-top)) 20px 14px;
+  min-height: 120px;
   text-align: center;
   position: sticky;           /* IMPORTANT for wallet browsers */
   top: 0;
@@ -121,8 +124,10 @@ header {
 .socials {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 16px;
   margin-top: 16px;
+  min-height: 40px;
 }
 
 .social-btn {
@@ -136,6 +141,7 @@ header {
   justify-content: center;
   cursor: pointer;
   transition: all .2s ease;
+  flex: 0 0 36px;
 }
 
 .social-btn svg {
@@ -143,6 +149,8 @@ header {
   height: 18px;
   fill: var(--gold);
   opacity: 0.8;
+  display: block;
+  flex: 0 0 auto;
 }
 
 .social-btn:hover {
@@ -180,7 +188,8 @@ footer {
 }
 
 @media (max-width: 900px) {
-  .grid-3, .grid-2 {
+  .grid-3,
+  .grid-2 {
     grid-template-columns: 1fr;
   }
 }
@@ -191,8 +200,9 @@ footer {
 
 .card,
 .panel {
-  background: radial-gradient(circle at 0% 0%, rgba(255,255,255,0.04), transparent 55%),
-              linear-gradient(135deg, rgba(15,18,24,1), rgba(5,7,11,0.95));
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255,255,255,0.04), transparent 55%),
+    linear-gradient(135deg, rgba(15,18,24,1), rgba(5,7,11,0.95));
   border-radius: var(--radius);
   border: 1px solid var(--border-soft);
   padding: 18px 18px;
@@ -235,8 +245,11 @@ footer {
 nav.tab-nav {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 20px;
-  margin: 18px auto 18px;
+  margin: 0 auto 18px;
+  padding-top: 18px;
+  min-height: 56px;
   flex-wrap: wrap;
 }
 
@@ -397,9 +410,17 @@ nav button.active {
   font-size: 13px;
 }
 
-.small { font-size: 12px; }
-.muted { color: var(--muted); }
-.mono  { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+.small {
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
 
 /* Chips */
 
@@ -430,9 +451,17 @@ nav button.active {
   font-weight: 600;
 }
 
-.tx-row .label.buy { color: #4ade80; }
-.tx-row .label.sell { color: #f97373; }
-.tx-row .label.claim { color: #facc15; }
+.tx-row .label.buy {
+  color: #4ade80;
+}
+
+.tx-row .label.sell {
+  color: #f97373;
+}
+
+.tx-row .label.claim {
+  color: #facc15;
+}
 
 .chart-container {
   width: 100%;
@@ -445,11 +474,11 @@ nav button.active {
 
 .wallet-adapter-modal,
 .wallet-adapter-modal-wrapper,
-.wallet-adapter-modal-container{
+.wallet-adapter-modal-container {
   z-index: 9999999 !important;
 }
 
-.wallet-adapter-dropdown{
+.wallet-adapter-dropdown {
   position: fixed !important;
   top: calc(12px + var(--safe-top)) !important;
   right: calc(12px + var(--safe-right)) !important;
@@ -457,17 +486,18 @@ nav button.active {
 }
 
 .wallet-adapter-button,
-.wallet-adapter-button-trigger{
+.wallet-adapter-button-trigger {
   position: relative !important;
   z-index: 2147483647 !important;
 }
 
-.wallet-adapter-dropdown-list{
+.wallet-adapter-dropdown-list {
   z-index: 2147483647 !important;
 }
 
 /* Optional: falls irgendein Parent clippt */
-header, #root{
+header,
+#root {
   overflow: visible;
 }
 
@@ -476,7 +506,7 @@ header, #root{
    - passt zu WalletButtons.tsx (wallet-slot / wallet-elite-btn / wallet-chip)
    ============================================================ */
 
-.wallet-slot{
+.wallet-slot {
   position: fixed;
   top: calc(10px + var(--safe-top));
   right: calc(10px + var(--safe-right));
@@ -484,7 +514,7 @@ header, #root{
   pointer-events: auto;
 }
 
-.walletbar{
+.walletbar {
   display: flex;
   gap: 10px;
   align-items: center;
@@ -494,7 +524,7 @@ header, #root{
 }
 
 /* Chip (connected state) */
-.wallet-chip{
+.wallet-chip {
   display: inline-flex;
   align-items: center;
   padding: 7px 12px;
@@ -509,7 +539,7 @@ header, #root{
 }
 
 /* Elite Button */
-.wallet-elite-btn{
+.wallet-elite-btn {
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-weight: 900;
   font-size: 13px;
@@ -533,13 +563,13 @@ header, #root{
   white-space: nowrap;
 }
 
-.wallet-elite-btn:hover{
+.wallet-elite-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 16px 40px rgba(245,197,66,0.45);
   filter: brightness(1.03);
 }
 
-.wallet-elite-btn:disabled{
+.wallet-elite-btn:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
@@ -552,7 +582,7 @@ header, #root{
    - Looks like "Institution Login"
    ============================================================ */
 
-.wallet-connect-bottom{
+.wallet-connect-bottom {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
@@ -566,7 +596,7 @@ header, #root{
 }
 
 /* Make the wallet-adapter button look premium */
-.wallet-connect-bottom .wallet-adapter-button{
+.wallet-connect-bottom .wallet-adapter-button {
   border-radius: 16px !important;
   padding: 14px 26px !important;
   height: 52px !important;
@@ -585,14 +615,14 @@ header, #root{
   transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
 }
 
-.wallet-connect-bottom .wallet-adapter-button:hover{
+.wallet-connect-bottom .wallet-adapter-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 22px 60px rgba(0,0,0,0.60), 0 0 28px rgba(245,197,66,0.22);
   filter: brightness(1.03);
 }
 
 /* Optional: small helper line below the button (if you add it later) */
-.wallet-connect-bottom .wallet-connect-hint{
+.wallet-connect-bottom .wallet-connect-hint {
   margin-top: 8px;
   text-align: center;
   font-size: 11px;
@@ -600,14 +630,122 @@ header, #root{
 }
 
 /* Mobile / Wallet Browser */
-@media (max-width: 700px){
-  .wallet-connect-bottom{
+@media (max-width: 700px) {
+  .wallet-connect-bottom {
     width: calc(100vw - 24px);
     bottom: calc(12px + var(--safe-bottom));
   }
-  .wallet-connect-bottom .wallet-adapter-button{
+
+  .wallet-connect-bottom .wallet-adapter-button {
     width: 100% !important;
     min-width: 0;
+  }
+}
+
+/* ============================================================
+   PATCH: Trading Tab — Wallet Connect NICHT verrutschen
+   - Button sitzt im Trading Panel statt unten "rauszurutschen"
+   - Global bleibt Bottom-Center fixed wie gehabt
+   - KEIN Abschneiden (overflow sichtbar)
+   ============================================================ */
+
+.trading-connect-box,
+.trade-connect-box {
+  width: 100%;
+  max-width: 860px;
+  margin: 22px auto 0;
+  padding: 20px 20px;
+  border-radius: 20px;
+
+  background:
+    radial-gradient(circle at 0% 0%, rgba(245,197,66,0.10), transparent 62%),
+    linear-gradient(135deg, rgba(15,18,24,1), rgba(5,7,11,0.96));
+
+  border: 1px solid rgba(245,197,66,0.22);
+  box-shadow: 0 24px 58px rgba(0,0,0,0.62);
+
+  position: relative;
+  z-index: 2;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+
+  overflow: visible; /* <- WICHTIG: niemals abschneiden */
+}
+
+.trading-connect-title,
+.trade-connect-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.trading-connect-text,
+.trade-connect-text {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  max-width: 720px;
+}
+
+.trading-connect-btnrow,
+.trade-connect-btnrow {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  overflow: visible; /* <- kein clipping */
+}
+
+/* CRITICAL FIX:
+   Wenn .wallet-connect-bottom in Trading Box gerendert wird,
+   muss er dort normal fließen statt fixed-bottom */
+.trading-connect-box .wallet-connect-bottom,
+.trade-connect-box .wallet-connect-bottom {
+  position: relative !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  margin-top: 6px;
+  overflow: visible !important;
+}
+
+/* Premium Button im Panel */
+.trading-connect-box .wallet-adapter-button,
+.trade-connect-box .wallet-adapter-button {
+  min-width: 260px !important;
+  height: 52px !important;
+  border-radius: 16px !important;
+  padding: 14px 26px !important;
+
+  box-shadow:
+    0 18px 50px rgba(0,0,0,0.55),
+    0 0 24px rgba(245,197,66,0.18);
+}
+
+/* Mobile: Button bleibt vollbreit im Panel */
+@media (max-width: 700px) {
+  .trading-connect-box,
+  .trade-connect-box {
+    padding: 18px 14px;
+    border-radius: 18px;
+  }
+
+  .trading-connect-box .wallet-adapter-button,
+  .trade-connect-box .wallet-adapter-button {
+    width: 100% !important;
+    min-width: 0 !important;
   }
 }
 
@@ -618,45 +756,76 @@ header, #root{
 @media (max-width: 700px) {
   header {
     padding-top: calc(12px + var(--safe-top));
+    min-height: 112px;
   }
+
   .brand {
     font-size: 32px;
   }
+
   .subline {
     font-size: 10px;
     letter-spacing: 0.14em;
   }
+
   #root {
     width: calc(100vw - 16px);
     padding: 0 10px 30px;
   }
 
   /* Wallet slot stays inside viewport and looks native */
-  .wallet-slot{
+  .wallet-slot {
     top: calc(8px + var(--safe-top));
     right: calc(8px + var(--safe-right));
   }
-  .wallet-elite-btn{
+
+  .wallet-elite-btn {
     min-width: 150px;
     padding: 9px 12px;
     border-radius: 12px;
   }
 
   /* Buttons go full width for "bank app" UX */
-  .btn{
+  .btn {
     width: 100%;
   }
 
   /* Prevent KV overflow in webviews */
-  .kv{
+  .kv {
     align-items: flex-start;
     gap: 10px;
+  }
+
+  .socials {
+    gap: 12px;
+    min-height: 36px;
+  }
+
+  nav.tab-nav {
+    gap: 14px;
+    min-height: 52px;
+    padding-top: 14px;
   }
 }
 
 /* Ultra-small devices */
-@media (max-width: 420px){
-  .brand{ font-size: 28px; }
-  .socials{ gap: 12px; }
-  .social-btn{ width: 34px; height: 34px; }
+@media (max-width: 420px) {
+  .brand {
+    font-size: 28px;
+  }
+
+  .socials {
+    gap: 12px;
+  }
+
+  .social-btn {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+  }
+
+  .social-btn svg {
+    width: 17px;
+    height: 17px;
+  }
 }
