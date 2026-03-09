@@ -66,9 +66,9 @@ import "./index.css";
 interface ImportMetaEnv {
   readonly VITE_RPC_URL?: string;
 
-  // ✅ optional backend controls (GH Pages safe)
-  readonly VITE_BACKEND_ENABLED?: string; // "1" to enable
-  readonly VITE_BACKEND_URL?: string; // e.g. https://your-backend.tld
+  // optional backend controls (GH Pages safe)
+  readonly VITE_BACKEND_ENABLED?: string;
+  readonly VITE_BACKEND_URL?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;
@@ -78,13 +78,11 @@ interface ImportMeta {
 // RPC (Leak-Safe, single source of truth)
 // -------------------------
 function getRpcUrl(): string {
-  // ✅ public safe default (no api-key)
   const DEFAULT_RPC = "https://isabelle-2w7wuk-fast-mainnet.helius-rpc.com";
 
   const envRpc = import.meta.env.VITE_RPC_URL?.trim();
   const rpc = envRpc && envRpc.length > 0 ? envRpc : DEFAULT_RPC;
 
-  // Hard safety: never allow api keys in frontend
   if (rpc.includes("api-key=") || rpc.includes("apiKey=")) {
     throw new Error(
       "SECURITY: VITE_RPC_URL contains api-key. Remove it and use a keyless endpoint or server proxy."
@@ -126,7 +124,7 @@ const DEX_PAIR = "6xBMvGzomHgPdWtD3V4JQ8rqji5EWtFDDoAyQhYsVVd2";
 type DexPairResponse = {
   pairs?: Array<{
     priceUsd?: string;
-    priceNative?: string; // in SOL
+    priceNative?: string;
   }>;
 };
 
@@ -217,9 +215,9 @@ type Tab = "Dashboard" | "Trading" | "Forum" | "Leaderboard" | "Airdrop";
 
 type ChartPoint = {
   time: string;
-  dmdUsd: number; // Market (Dex)
-  dmdAppUsd: number; // App/Fair Value (Treasury/Manual/Floor)
-  solUsd: number; // optional context
+  dmdUsd: number;
+  dmdAppUsd: number;
+  solUsd: number;
 };
 
 // =============================================================
@@ -273,7 +271,6 @@ function UIWrapper() {
     <>
       <WelcomeOverlay />
 
-      {/* ✅ PATCH: Scoped override so your global ".wallet-adapter-dropdown{position:fixed;top/right}" DOES NOT move this bottom button */}
       <style>{`
         .wallet-connect-bottom .wallet-adapter-dropdown {
           position: static !important;
@@ -292,7 +289,6 @@ function UIWrapper() {
         }
       `}</style>
 
-      {/* ✅ Bottom-Center Wallet Connect (nur wenn NICHT verbunden) */}
       {!connected && (
         <div
           className="wallet-connect-bottom"
@@ -372,7 +368,6 @@ function DashboardPage() {
         if (sol > 0) setSolUsd(sol);
         if (dmdMarket > 0) setDmdUsd(dmdMarket);
 
-        // ✅ GH Pages safe feeds: only if backend is enabled + JSON
         let pubRaw: unknown = [];
         let treRaw: unknown = [];
         let fouRaw: unknown = [];
@@ -547,9 +542,9 @@ function TradingPage() {
   const [priceLamports10k, setPriceLamports10k] = useState<number | null>(null);
   const [vaultDmd, setVaultDmd] = useState<number | null>(null);
 
-  // NEW: wallet DMD balance + market price + timer
   const [walletDmd, setWalletDmd] = useState<number>(0);
   const [dmdMarketUsd, setDmdMarketUsd] = useState<number>(0);
+  const [walletInternalValueUsd, setWalletInternalValueUsd] = useState<number>(0);
   const [nowTs, setNowTs] = useState<number>(() => Math.floor(Date.now() / 1000));
 
   useEffect(() => {
@@ -585,11 +580,9 @@ function TradingPage() {
         const vault = findVaultPda();
         const bs = findBuyerStatePda(vault, wallet.publicKey);
 
-        // Dex Market price (USD)
         const market = await fetchDmdUsdFromDex(DEX_PAIR).catch(() => 0);
         if (alive && market > 0) setDmdMarketUsd(market);
 
-        // Wallet DMD balance
         const buyerAta = ataOf(wallet.publicKey, DMD_MINT);
         const bBal = await connection
           .getTokenAccountBalance(buyerAta)
@@ -613,10 +606,13 @@ function TradingPage() {
         const vaultAcc = await connection.getAccountInfo(vault).catch(() => null);
         if (!alive) return;
 
+        let nextPriceLamports10k = 0;
+
         if (vaultAcc?.data) {
           const decoded = accCoder.decode("Vault", vaultAcc.data);
           const n = readNumberField(decoded, "initial_price_sol");
-          setPriceLamports10k(typeof n === "number" ? n : 0);
+          nextPriceLamports10k = typeof n === "number" ? n : 0;
+          setPriceLamports10k(nextPriceLamports10k);
         }
 
         const vAta = ataOf(vault, DMD_MINT);
@@ -626,9 +622,37 @@ function TradingPage() {
           .catch(() => 0);
         const treLam = await connection.getBalance(TREASURY).catch(() => 0);
 
+        const pricing = await computeDmdPricing({
+          lamportsPer10k: nextPriceLamports10k > 0 ? nextPriceLamports10k : undefined,
+          treasuryLamports: treLam > 0 ? treLam : undefined,
+          manualFloorUsd: 0.01,
+          treasuryWeight: 1.0,
+        });
+
+        const appUsd = pricing.usdPerDmdFinal ?? 0;
+
+        let internalValue = 0;
+
+        if (bBal > 0 && appUsd > 0) {
+          const baseValue = bBal * appUsd;
+
+          const treasuryUsd =
+            pricing.solUsd > 0 ? (treLam / LAMPORTS_PER_SOL) * pricing.solUsd : 0;
+
+          const supportPerDmd =
+            treasuryUsd > 0 && balance > 0 ? treasuryUsd / Math.max(balance, 1) : 0;
+
+          const supportValueRaw = bBal * supportPerDmd;
+          const supportCap = baseValue * 0.12;
+          const supportValue = Math.min(supportValueRaw, supportCap);
+
+          internalValue = baseValue + supportValue;
+        }
+
         if (!alive) return;
         setVaultDmd(balance);
         setTreasurySol(treLam / LAMPORTS_PER_SOL);
+        setWalletInternalValueUsd(internalValue);
       } catch (e) {
         console.error("Trading pull error:", e);
       }
@@ -644,9 +668,9 @@ function TradingPage() {
 
   function slippageToBps(s: string): number {
     const n = Number(String(s || "").replace(",", "."));
-    if (!Number.isFinite(n) || n <= 0) return 1; // minimum 1 bps
-    const clamped = Math.max(0, Math.min(50, n)); // 0..50%
-    return Math.max(1, Math.floor(clamped * 100)); // 1% => 100 bps
+    if (!Number.isFinite(n) || n <= 0) return 1;
+    const clamped = Math.max(0, Math.min(50, n));
+    return Math.max(1, Math.floor(clamped * 100));
   }
 
   async function handleAutoWhitelist() {
@@ -837,9 +861,23 @@ function TradingPage() {
           <div className="panel" style={{ marginBottom: 20 }}>
             <div className="panel-title">Wallet Overview</div>
 
-            <div className="kv">
+            <div className="kv" style={{ alignItems: "flex-start" }}>
               <span>Dein DMD</span>
-              <b>{walletDmd.toLocaleString()}</b>
+              <div style={{ textAlign: "right" }}>
+                <b style={{ display: "block" }}>{walletDmd.toLocaleString()}</b>
+                <span
+                  style={{
+                    display: "block",
+                    marginTop: 4,
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.56)",
+                    fontWeight: 600,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {walletInternalValueUsd > 0 ? fmtUsd(walletInternalValueUsd) : "—"}
+                </span>
+              </div>
             </div>
 
             <div className="kv">
@@ -1055,7 +1093,6 @@ export default function App() {
     []
   );
 
-  // ✅ single source of truth
   const endpoint = getRpcUrl();
 
   return (
