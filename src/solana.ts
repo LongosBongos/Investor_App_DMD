@@ -43,13 +43,13 @@ export const ADMIN_WALLET = new PublicKey(
 );
 
 // Compatibility export for the current App.tsx import surface.
-// This is intentionally mapped to the current protocol owner truth.
 export const FOUNDER = PROTOCOL_OWNER;
 
 // SPL / ATA programs
 export const TOKEN_PROGRAM_ID = new PublicKey(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 );
+
 export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 );
@@ -117,6 +117,7 @@ export function ataFor(
 
 export const vaultAta = (vault: PublicKey = findVaultPda()) =>
   ataFor(vault, DMD_MINT);
+
 export const buyerAta = (buyer: PublicKey) => ataFor(buyer, DMD_MINT);
 
 // --------------------------------------------------
@@ -176,40 +177,59 @@ export function createAtaIx(
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: anchor.web3.SYSVAR_RENT_PUBKEY,
+        isSigner: false,
+        isWritable: false,
+      },
     ],
     data: Buffer.alloc(0),
   });
 }
 
 // --------------------------------------------------
-// Runtime truth helpers
+// Decode / normalize helpers
 // --------------------------------------------------
-export const DMD_RUNTIME_TRUTH = {
-  programId: PROGRAM_ID,
-  mint: DMD_MINT,
-  protocolOwner: PROTOCOL_OWNER,
-  treasury: TREASURY,
-  admin: ADMIN_WALLET,
-} as const;
-
-export function isProtocolOwner(
-  pubkey: PublicKey | null | undefined
-): boolean {
-  return !!pubkey && pubkey.equals(PROTOCOL_OWNER);
+function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("Expected object-like decoded account");
+  }
+  return value as Record<string, unknown>;
 }
 
-export function isTreasury(pubkey: PublicKey | null | undefined): boolean {
-  return !!pubkey && pubkey.equals(TREASURY);
+function requireBool(value: unknown, name: string): boolean {
+  if (typeof value === "boolean") return value;
+  throw new Error(`Expected boolean for ${name}`);
 }
 
-// --------------------------------------------------
-// On-chain account shapes (decode helpers for later App hardening)
-// --------------------------------------------------
-export type VaultAccountDecoded = {
+function requireNumber(value: unknown, name: string): number {
+  if (typeof value === "number") return value;
+  throw new Error(`Expected number for ${name}`);
+}
+
+function requirePubkey(value: unknown, name: string): PublicKey {
+  if (value instanceof PublicKey) return value;
+  if (typeof value === "string") return new PublicKey(value);
+  throw new Error(`Expected pubkey for ${name}`);
+}
+
+function requireBn(value: unknown, name: string): anchor.BN {
+  if (value instanceof anchor.BN) return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    typeof value === "string"
+  ) {
+    return new anchor.BN(value);
+  }
+  throw new Error(`Expected BN-compatible value for ${name}`);
+}
+
+export type VaultDecoded = {
   owner: PublicKey;
   totalSupply: anchor.BN;
   presaleSold: anchor.BN;
-  initialPriceSol: anchor.BN;
+  initialPriceLamportsPer10k: anchor.BN;
   publicSaleActive: boolean;
   mint: PublicKey;
   mintDecimals: number;
@@ -240,46 +260,15 @@ export type BuyerStateExtV2Decoded = {
   firstClaimDone: boolean;
 };
 
-function asRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null) {
-    throw new Error("Invalid decoded account object.");
-  }
-  return value as Record<string, unknown>;
-}
-
-function requirePubkey(value: unknown, field: string): PublicKey {
-  if (value instanceof PublicKey) return value;
-  throw new Error(`Decoded field '${field}' is not a PublicKey.`);
-}
-
-function requireBn(value: unknown, field: string): anchor.BN {
-  if (value instanceof anchor.BN) return value;
-  if (typeof value === "bigint") return new anchor.BN(value.toString());
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return new anchor.BN(value);
-  }
-  throw new Error(`Decoded field '${field}' is not a BN-compatible value.`);
-}
-
-function requireBool(value: unknown, field: string): boolean {
-  if (typeof value === "boolean") return value;
-  throw new Error(`Decoded field '${field}' is not a boolean.`);
-}
-
-function requireNumber(value: unknown, field: string): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  throw new Error(`Decoded field '${field}' is not a number.`);
-}
-
-export function normalizeVaultAccount(decoded: unknown): VaultAccountDecoded {
+export function normalizeVault(decoded: unknown): VaultDecoded {
   const obj = asRecord(decoded);
   return {
     owner: requirePubkey(obj.owner, "owner"),
     totalSupply: requireBn(obj.totalSupply ?? obj.total_supply, "totalSupply"),
     presaleSold: requireBn(obj.presaleSold ?? obj.presale_sold, "presaleSold"),
-    initialPriceSol: requireBn(
+    initialPriceLamportsPer10k: requireBn(
       obj.initialPriceSol ?? obj.initial_price_sol,
-      "initialPriceSol"
+      "initialPriceLamportsPer10k"
     ),
     publicSaleActive: requireBool(
       obj.publicSaleActive ?? obj.public_sale_active,
@@ -320,10 +309,7 @@ export function normalizeBuyerState(decoded: unknown): BuyerStateDecoded {
       "lastRewardClaim"
     ),
     lastSell: requireBn(obj.lastSell ?? obj.last_sell, "lastSell"),
-    holdingSince: requireBn(
-      obj.holdingSince ?? obj.holding_since,
-      "holdingSince"
-    ),
+    holdingSince: requireBn(obj.holdingSince ?? obj.holding_since, "holdingSince"),
     lastBuyDay: requireBn(obj.lastBuyDay ?? obj.last_buy_day, "lastBuyDay"),
     buyCountToday: requireBn(
       obj.buyCountToday ?? obj.buy_count_today,
@@ -362,17 +348,17 @@ export function normalizeBuyerStateExtV2(
 }
 
 // --------------------------------------------------
-// Founder / admin side instructions
-// Kept here for completeness, but Investor App should not expose all of them.
+// Protocol / admin side instructions
+// Kept here for completeness.
 // --------------------------------------------------
 export function ixInitialize(
   ixCoder: anchor.BorshInstructionCoder,
-  founderPubkey: PublicKey,
-  initialPriceLamports: number | bigint
+  protocolOwnerPubkey: PublicKey,
+  initialPriceLamportsPer10k: number | bigint
 ): TransactionInstruction {
   const vault = findVaultPda();
-  const buyerState = findBuyerStatePda(vault, founderPubkey);
-  const founderTokenAccount = ataFor(founderPubkey, DMD_MINT);
+  const buyerState = findBuyerStatePda(vault, protocolOwnerPubkey);
+  const protocolOwnerTokenAccount = ataFor(protocolOwnerPubkey, DMD_MINT);
 
   return ix_fromCoder(
     ixCoder,
@@ -380,20 +366,24 @@ export function ixInitialize(
     [
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: buyerState, isSigner: false, isWritable: true },
-      { pubkey: founderPubkey, isSigner: true, isWritable: true },
+      { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: true },
       { pubkey: DMD_MINT, isSigner: false, isWritable: true },
-      { pubkey: founderTokenAccount, isSigner: false, isWritable: true },
+      {
+        pubkey: protocolOwnerTokenAccount,
+        isSigner: false,
+        isWritable: true,
+      },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    { initial_price_sol: bn(initialPriceLamports) }
+    { initial_price_sol: bn(initialPriceLamportsPer10k) }
   );
 }
 
 export function ixTogglePublicSale(
   ixCoder: anchor.BorshInstructionCoder,
   active: boolean,
-  founderPubkey: PublicKey = PROTOCOL_OWNER
+  protocolOwnerPubkey: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
   const vault = findVaultPda();
 
@@ -402,7 +392,7 @@ export function ixTogglePublicSale(
     "toggle_public_sale",
     [
       { pubkey: vault, isSigner: false, isWritable: true },
-      { pubkey: founderPubkey, isSigner: true, isWritable: true },
+      { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: false },
     ],
     { active }
   );
@@ -412,7 +402,7 @@ export function ixWhitelistAdd(
   ixCoder: anchor.BorshInstructionCoder,
   buyerPubkey: PublicKey,
   status: boolean,
-  founderPubkey: PublicKey = PROTOCOL_OWNER
+  protocolOwnerPubkey: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
   const vault = findVaultPda();
   const buyerState = findBuyerStatePda(vault, buyerPubkey);
@@ -424,7 +414,7 @@ export function ixWhitelistAdd(
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: buyerPubkey, isSigner: false, isWritable: false },
       { pubkey: buyerState, isSigner: false, isWritable: true },
-      { pubkey: founderPubkey, isSigner: true, isWritable: true },
+      { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     { status }
@@ -434,7 +424,7 @@ export function ixWhitelistAdd(
 export function ixSetManualPrice(
   ixCoder: anchor.BorshInstructionCoder,
   lamportsPer10k: number | bigint,
-  founderPubkey: PublicKey = PROTOCOL_OWNER
+  protocolOwnerPubkey: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
   const vault = findVaultPda();
 
@@ -443,7 +433,7 @@ export function ixSetManualPrice(
     "set_manual_price",
     [
       { pubkey: vault, isSigner: false, isWritable: true },
-      { pubkey: founderPubkey, isSigner: true, isWritable: false },
+      { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: false },
     ],
     { lamports_per_10k: bn(lamportsPer10k) }
   );
@@ -452,7 +442,7 @@ export function ixSetManualPrice(
 export function ixTransferVaultOwner(
   ixCoder: anchor.BorshInstructionCoder,
   newOwner: PublicKey,
-  founderPubkey: PublicKey = PROTOCOL_OWNER
+  protocolOwnerPubkey: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
   const vault = findVaultPda();
 
@@ -461,7 +451,7 @@ export function ixTransferVaultOwner(
     "transfer_vault_owner",
     [
       { pubkey: vault, isSigner: false, isWritable: true },
-      { pubkey: founderPubkey, isSigner: true, isWritable: false },
+      { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: false },
     ],
     { new_owner: newOwner }
   );
@@ -469,7 +459,11 @@ export function ixTransferVaultOwner(
 
 export function ixInitializeVaultConfigV2(
   ixCoder: anchor.BorshInstructionCoder,
-  founderPubkey: PublicKey = PROTOCOL_OWNER
+  treasury: PublicKey,
+  manualPriceLamportsPer10k: number | bigint,
+  dynamicPricingEnabled: boolean,
+  sellLive: boolean,
+  protocolOwnerPubkey: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
   const vault = findVaultPda();
   const vaultConfigV2 = findVaultConfigV2Pda(vault);
@@ -480,10 +474,15 @@ export function ixInitializeVaultConfigV2(
     [
       { pubkey: vault, isSigner: false, isWritable: false },
       { pubkey: vaultConfigV2, isSigner: false, isWritable: true },
-      { pubkey: founderPubkey, isSigner: true, isWritable: true },
+      { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    {}
+    {
+      treasury,
+      manual_price_lamports_per_10k: bn(manualPriceLamportsPer10k),
+      dynamic_pricing_enabled: dynamicPricingEnabled,
+      sell_live: sellLive,
+    }
   );
 }
 
@@ -493,7 +492,7 @@ export function ixUpdateVaultConfigV2(
   manualPriceLamportsPer10k: number | bigint,
   dynamicPricingEnabled: boolean,
   sellLive: boolean,
-  founderPubkey: PublicKey = PROTOCOL_OWNER
+  protocolOwnerPubkey: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
   const vault = findVaultPda();
   const vaultConfigV2 = findVaultConfigV2Pda(vault);
@@ -504,7 +503,7 @@ export function ixUpdateVaultConfigV2(
     [
       { pubkey: vault, isSigner: false, isWritable: false },
       { pubkey: vaultConfigV2, isSigner: false, isWritable: true },
-      { pubkey: founderPubkey, isSigner: true, isWritable: false },
+      { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: false },
     ],
     {
       treasury,
@@ -564,7 +563,7 @@ export function ixBuyDmd(
   ixCoder: anchor.BorshInstructionCoder,
   buyerPubkey: PublicKey,
   solContributionLamports: number | bigint,
-  founderSystem: PublicKey = PROTOCOL_OWNER,
+  protocolOwnerSystem: PublicKey = PROTOCOL_OWNER,
   treasury: PublicKey = TREASURY
 ): TransactionInstruction {
   const vault = findVaultPda();
@@ -582,7 +581,7 @@ export function ixBuyDmd(
       { pubkey: vaultConfigV2, isSigner: false, isWritable: false },
       { pubkey: buyerState, isSigner: false, isWritable: true },
       { pubkey: buyerStateExtV2, isSigner: false, isWritable: true },
-      { pubkey: founderSystem, isSigner: false, isWritable: true },
+      { pubkey: protocolOwnerSystem, isSigner: false, isWritable: true },
       { pubkey: treasury, isSigner: false, isWritable: true },
       { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
       { pubkey: buyerTokenAccount, isSigner: false, isWritable: true },
@@ -628,15 +627,17 @@ export function ixClaimRewardV2(
 
 export function ixSwapExactSolForDmd(
   ixCoder: anchor.BorshInstructionCoder,
-  buyerPubkey: PublicKey,
-  amountLamports: number | bigint,
-  minOutDmd: number | bigint
+  userPubkey: PublicKey,
+  amountInLamports: number | bigint,
+  minOutDmd: number | bigint,
+  protocolOwnerSystem: PublicKey = PROTOCOL_OWNER,
+  treasury: PublicKey = TREASURY
 ): TransactionInstruction {
   const vault = findVaultPda();
   const vaultConfigV2 = findVaultConfigV2Pda(vault);
-  const buyerState = findBuyerStatePda(vault, buyerPubkey);
+  const buyerState = findBuyerStatePda(vault, userPubkey);
   const vaultTokenAccount = vaultAta(vault);
-  const userDmdAta = buyerAta(buyerPubkey);
+  const userDmdAta = buyerAta(userPubkey);
 
   return ix_fromCoder(
     ixCoder,
@@ -647,49 +648,87 @@ export function ixSwapExactSolForDmd(
       { pubkey: buyerState, isSigner: false, isWritable: true },
       { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
       { pubkey: userDmdAta, isSigner: false, isWritable: true },
-      { pubkey: PROTOCOL_OWNER, isSigner: false, isWritable: true },
-      { pubkey: TREASURY, isSigner: false, isWritable: true },
-      { pubkey: buyerPubkey, isSigner: true, isWritable: true },
+      { pubkey: protocolOwnerSystem, isSigner: false, isWritable: true },
+      { pubkey: treasury, isSigner: false, isWritable: true },
+      { pubkey: userPubkey, isSigner: true, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     {
-      amount_in_lamports: bn(amountLamports),
+      amount_in_lamports: bn(amountInLamports),
       min_out_dmd: bn(minOutDmd),
     }
   );
 }
 
-// --------------------------------------------------
-// Sell is intentionally blocked at the frontend layer
-// because the current contract truth disables sell paths.
-// These functions stay exported only to preserve App import compatibility
-// until App.tsx is hardened in the next step.
-// --------------------------------------------------
-const SELL_DISABLED_FRONTEND_MESSAGE =
-  "SELL_DISABLED_FRONTEND: DMD sell/swap-out is intentionally disabled until the on-chain policy is re-enabled.";
-
-function throwSellDisabled(): never {
-  throw new Error(SELL_DISABLED_FRONTEND_MESSAGE);
-}
-
 export function ixSwapExactDmdForSol(
-  _ixCoder: anchor.BorshInstructionCoder,
-  _buyerPubkey: PublicKey,
-  _amountInDmd: number | bigint,
-  _minOutLamports: number | bigint
+  ixCoder: anchor.BorshInstructionCoder,
+  userPubkey: PublicKey,
+  amountInDmd: number | bigint,
+  minOutSol: number | bigint,
+  treasury: PublicKey = TREASURY,
+  protocolOwnerSystem: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
-  return throwSellDisabled();
+  const vault = findVaultPda();
+  const vaultConfigV2 = findVaultConfigV2Pda(vault);
+  const buyerState = findBuyerStatePda(vault, userPubkey);
+  const vaultTokenAccount = vaultAta(vault);
+  const userDmdAta = buyerAta(userPubkey);
+
+  return ix_fromCoder(
+    ixCoder,
+    "swap_exact_dmd_for_sol",
+    [
+      { pubkey: vault, isSigner: false, isWritable: true },
+      { pubkey: vaultConfigV2, isSigner: false, isWritable: false },
+      { pubkey: buyerState, isSigner: false, isWritable: true },
+      { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: userDmdAta, isSigner: false, isWritable: true },
+      { pubkey: treasury, isSigner: false, isWritable: true },
+      { pubkey: protocolOwnerSystem, isSigner: false, isWritable: true },
+      { pubkey: userPubkey, isSigner: true, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    {
+      amount_in_dmd: bn(amountInDmd),
+      min_out_sol: bn(minOutSol),
+    }
+  );
 }
 
 export function ixSellDmdV2(
-  _ixCoder: anchor.BorshInstructionCoder,
-  _buyerPubkey: PublicKey,
-  _amountTokens: number | bigint,
-  _treasurySigner: PublicKey,
-  _founderSystem: PublicKey = PROTOCOL_OWNER
+  ixCoder: anchor.BorshInstructionCoder,
+  buyerPubkey: PublicKey,
+  amountTokens: number | bigint,
+  treasurySigner: PublicKey,
+  protocolOwnerSystem: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
-  return throwSellDisabled();
+  const vault = findVaultPda();
+  const vaultConfigV2 = findVaultConfigV2Pda(vault);
+  const buyerState = findBuyerStatePda(vault, buyerPubkey);
+  const vaultTokenAccount = vaultAta(vault);
+  const buyerTokenAccount = buyerAta(buyerPubkey);
+
+  return ix_fromCoder(
+    ixCoder,
+    "sell_dmd_v2",
+    [
+      { pubkey: vault, isSigner: false, isWritable: true },
+      { pubkey: vaultConfigV2, isSigner: false, isWritable: false },
+      { pubkey: buyerState, isSigner: false, isWritable: true },
+      { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: buyerTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: treasurySigner, isSigner: true, isWritable: true },
+      { pubkey: protocolOwnerSystem, isSigner: false, isWritable: true },
+      { pubkey: buyerPubkey, isSigner: true, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    {
+      amount_tokens: bn(amountTokens),
+    }
+  );
 }
 
 export { SystemProgram };
