@@ -1,6 +1,13 @@
+// src/Leaderboard.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Connection, Commitment, PublicKey } from "@solana/web3.js";
-import { findVaultPda, ataFor as ataOf, FOUNDER, TREASURY, DMD_MINT } from "./solana";
+import { Commitment, Connection, PublicKey } from "@solana/web3.js";
+import {
+  findVaultPda,
+  ataFor as ataOf,
+  PROTOCOL_OWNER,
+  TREASURY,
+  DMD_MINT,
+} from "./solana";
 
 // -------------------------
 // Vite Env Typing
@@ -13,33 +20,49 @@ interface ImportMeta {
 }
 
 const CONFIRMED: Commitment = "confirmed";
+const DEFAULT_RPC = "https://api.mainnet-beta.solana.com";
+const MAX_LARGEST_ACCOUNTS = 80;
+const MAX_ROWS = 25;
 
 // -------------------------
 // Types
 // -------------------------
 type HolderRow = {
   rank: number;
-  owner: string;       // wallet address
+  owner: string;
   tokenAccount: string;
-  amount: number;      // ui amount
-  pct: number;         // % of supply
+  amount: number;
+  pct: number;
 };
 
-function shortPk(pk: string, a = 6, b = 6) {
+function getRpcUrl(): string {
+  const envRpc = import.meta.env.VITE_RPC_URL?.trim();
+  const rpc = envRpc && envRpc.length > 0 ? envRpc : DEFAULT_RPC;
+
+  if (rpc.includes("api-key=") || rpc.includes("apiKey=")) {
+    throw new Error(
+      "SECURITY: VITE_RPC_URL contains api-key. Remove it and use a keyless endpoint or a backend proxy."
+    );
+  }
+
+  return rpc;
+}
+
+function shortPk(pk: string, a = 6, b = 6): string {
   return `${pk.slice(0, a)}…${pk.slice(-b)}`;
 }
 
-function fmtNum(x: number, d = 0) {
+function fmtNum(x: number, d = 0): string {
   if (!Number.isFinite(x)) return "—";
   return x.toLocaleString(undefined, { maximumFractionDigits: d });
 }
 
-function fmtPct(x: number) {
+function fmtPct(x: number): string {
   if (!Number.isFinite(x)) return "—";
   return `${x.toFixed(4)}%`;
 }
 
-function clamp01(x: number) {
+function clamp01(x: number): number {
   if (!Number.isFinite(x)) return 0;
   return Math.max(0, Math.min(1, x));
 }
@@ -49,11 +72,10 @@ function isRecord(x: unknown): x is Record<string, unknown> {
 }
 
 function getParsedOwner(parsed: unknown): string | null {
-  // parsed?.info?.owner
   if (!isRecord(parsed)) return null;
-  const info = parsed["info"];
+  const info = parsed.info;
   if (!isRecord(info)) return null;
-  const owner = info["owner"];
+  const owner = info.owner;
   return typeof owner === "string" ? owner : null;
 }
 
@@ -62,19 +84,22 @@ async function getMintSupplyUi(connection: Connection, mint: PublicKey): Promise
   return Number(s.value.uiAmount ?? 0);
 }
 
-async function getOwnerOfTokenAccount(connection: Connection, tokenAccount: PublicKey): Promise<string | null> {
+async function getOwnerOfTokenAccount(
+  connection: Connection,
+  tokenAccount: PublicKey
+): Promise<string | null> {
   const ai = await connection.getParsedAccountInfo(tokenAccount, CONFIRMED);
   const data = ai.value?.data;
-
-  // parsed token account response shape:
-  // { program: 'spl-token', parsed: { type: 'account', info: { owner: '...' } }, space: ... }
   if (!isRecord(data)) return null;
-  const parsed = data["parsed"];
+  const parsed = data.parsed;
   if (!isRecord(parsed)) return null;
   return getParsedOwner(parsed);
 }
 
-async function getUiAmountOfTokenAccount(connection: Connection, tokenAccount: PublicKey): Promise<number> {
+async function getUiAmountOfTokenAccount(
+  connection: Connection,
+  tokenAccount: PublicKey
+): Promise<number> {
   const b = await connection.getTokenAccountBalance(tokenAccount, CONFIRMED);
   return Number(b.value.uiAmount ?? 0);
 }
@@ -87,25 +112,21 @@ export default function Leaderboard(): JSX.Element {
   const [excludeSystemWallets, setExcludeSystemWallets] = useState<boolean>(true);
 
   const connection = useMemo(() => {
-    const rpc =
-      import.meta.env.VITE_RPC_URL ??
-      "https://mainnet.helius-rpc.com/?api-key=cba27cb3-9d36-4095-ae3a-4025bc7ff611";
+    const rpc = getRpcUrl();
     return new Connection(rpc, CONFIRMED);
   }, []);
 
   const vault = useMemo(() => findVaultPda(), []);
 
   const systemOwners = useMemo(() => {
-    // Owner-Adressen die “System” sind (Founder/Treasury/Vault PDA)
     return new Set<string>([
-      FOUNDER.toBase58(),
+      PROTOCOL_OWNER.toBase58(),
       TREASURY.toBase58(),
       vault.toBase58(),
     ]);
   }, [vault]);
 
   const systemTokenAccounts = useMemo(() => {
-    // z.B. Vault ATA
     const vAta = ataOf(vault, DMD_MINT);
     return new Set<string>([vAta.toBase58()]);
   }, [vault]);
@@ -117,41 +138,35 @@ export default function Leaderboard(): JSX.Element {
       try {
         setErr("");
 
-        // 1) Supply
         const s = await getMintSupplyUi(connection, DMD_MINT);
         if (!alive) return;
         setSupplyUi(s);
 
-        // 2) Largest token accounts (load more, then filter)
         const largest = await connection.getTokenLargestAccounts(DMD_MINT, CONFIRMED);
         if (!alive) return;
 
-        // Pull deeper to survive filtering (LP/system accounts etc.)
-        const top = largest.value.slice(0, 60);
+        const top = largest.value.slice(0, MAX_LARGEST_ACCOUNTS);
 
-        // 3) Resolve owners + amounts
         const enriched = await Promise.all(
           top.map(async (x) => {
             const ta = x.address;
             const tokenAccount = ta.toBase58();
 
-            // Some RPCs include uiAmount; fallback to balance call if needed
             const uiMaybe = (x as unknown as { uiAmount?: number }).uiAmount;
-            const amount = (typeof uiMaybe === "number" && Number.isFinite(uiMaybe) && uiMaybe > 0)
-              ? uiMaybe
-              : await getUiAmountOfTokenAccount(connection, ta);
+            const amount =
+              typeof uiMaybe === "number" && Number.isFinite(uiMaybe) && uiMaybe > 0
+                ? uiMaybe
+                : await getUiAmountOfTokenAccount(connection, ta);
 
             const owner = await getOwnerOfTokenAccount(connection, ta);
-
             return { tokenAccount, owner, amount };
           })
         );
 
         if (!alive) return;
 
-        // 4) Filter + sort + rank
         const cleaned = enriched
-          .filter((it) => it.owner && it.amount > 0)
+          .filter((it) => typeof it.owner === "string" && !!it.owner && it.amount > 0)
           .filter((it) => {
             if (!excludeSystemWallets) return true;
             if (systemOwners.has(it.owner as string)) return false;
@@ -160,7 +175,7 @@ export default function Leaderboard(): JSX.Element {
           })
           .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
 
-        const finalRows: HolderRow[] = cleaned.slice(0, 25).map((it, idx) => {
+        const finalRows: HolderRow[] = cleaned.slice(0, MAX_ROWS).map((it, idx) => {
           const pct = s > 0 ? (it.amount / s) * 100 : 0;
           return {
             rank: idx + 1,
@@ -181,8 +196,11 @@ export default function Leaderboard(): JSX.Element {
       }
     }
 
-    pull();
-    const iv = window.setInterval(pull, 20_000);
+    void pull();
+    const iv = window.setInterval(() => {
+      void pull();
+    }, 20_000);
+
     return () => {
       alive = false;
       window.clearInterval(iv);
@@ -196,7 +214,15 @@ export default function Leaderboard(): JSX.Element {
 
   return (
     <div style={{ marginTop: 20 }}>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <div className="card-title" style={{ letterSpacing: 1, opacity: 0.7 }}>
             DMD HOLDER
@@ -210,14 +236,17 @@ export default function Leaderboard(): JSX.Element {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <label className="small muted" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <label
+            className="small muted"
+            style={{ display: "flex", gap: 8, alignItems: "center" }}
+          >
             <input
               type="checkbox"
               checked={excludeSystemWallets}
               onChange={(e) => setExcludeSystemWallets(e.target.checked)}
             />
-            Exclude Founder/Treasury/Vault
+            Exclude Protocol Owner / Treasury / Vault
           </label>
 
           <a
@@ -258,6 +287,7 @@ export default function Leaderboard(): JSX.Element {
             <tbody>
               {rows.map((r) => {
                 const bar = clamp01(r.pct / maxPct);
+
                 return (
                   <tr
                     key={r.tokenAccount}
@@ -357,9 +387,9 @@ export default function Leaderboard(): JSX.Element {
           </table>
         </div>
 
-        <p className="small muted" style={{ marginTop: 12 }}>
-          Hinweis: “Top Holder” basiert auf <code>getTokenLargestAccounts</code> (SPL Token Accounts).
-          
+        <p className="small muted" style={{ marginTop: 12, lineHeight: 1.5 }}>
+          Hinweis: Das Ranking basiert auf <code>getTokenLargestAccounts</code> und damit auf SPL-Token-Accounts,
+          nicht auf einer perfekten wirtschaftlichen Gruppierung verbundener Wallets.
         </p>
       </div>
     </div>

@@ -1,5 +1,24 @@
+# --------------------------------------------------
+# Dependencies
+# --------------------------------------------------
+node_modules/
+
+# --------------------------------------------------
+# Build / deploy artifacts
+# --------------------------------------------------
+dist/
+dist-ssr/
+coverage/
+.vite/
+.cache/
+.tmp/
+temp/
+tmp/
+
+# --------------------------------------------------
 # Logs
-logs
+# --------------------------------------------------
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,27 +26,94 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# --------------------------------------------------
+# Environment files
+# Keep only the public-safe template.
+# --------------------------------------------------
+.env
+.env.*
+!.env.example
 
-# Editor directories and files
+# --------------------------------------------------
+# OS / editor junk
+# --------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*.swn
+*.bak
+*.orig
+*~
+*.tmp
+*.temp
+
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# build
-/dist
+# --------------------------------------------------
+# Windows zone identifier leftovers
+# --------------------------------------------------
+*Zone.Identifier
+*.Zone.Identifier
 
-# Environment files
-.env
-.env.*
-!.env.example
+# --------------------------------------------------
+# Secrets / wallets / key material
+# --------------------------------------------------
+*.pem
+*.key
+*.p12
+*.pfx
+*.asc
+*.kdbx
+*.secret
+*.seed
+*.mnemonic
+id.json
+wallet.json
+founder.json
+treasury.json
+admin.json
+new_upgrade.json
 
+secure/
+secure/**
+wallets/
+wallets/**
+keys/
+keys/**
+keypairs/
+keypairs/**
+secrets/
+secrets/**
+
+# --------------------------------------------------
+# Solana / Anchor / local chain artifacts
+# --------------------------------------------------
+target/
+.anchor/
+test-ledger/
+ledger/
+.anchor-cache/
+solana-test-validator-ledger/
+
+# --------------------------------------------------
+# Misc tooling
+# --------------------------------------------------
+.vercel/
+.netlify/
+.turbo/
+.eslintcache
+
+# --------------------------------------------------
+# Keep source IDL versioned
+# --------------------------------------------------
+!src/idl/
+!src/idl/dmd_anchor.json

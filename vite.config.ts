@@ -1,4 +1,3 @@
-// vite.config.ts
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
@@ -7,6 +6,7 @@ const BASE = "/Investor_App_DMD/";
 
 export default defineConfig(({ command }) => ({
   base: command === "serve" ? "/" : BASE,
+
   plugins: [
     react(),
     nodePolyfills({
@@ -18,10 +18,13 @@ export default defineConfig(({ command }) => ({
       },
     }),
   ],
+
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 1600,
+    target: "es2020",
   },
+
   resolve: {
     alias: {
       stream: "stream-browserify",
@@ -29,16 +32,22 @@ export default defineConfig(({ command }) => ({
       buffer: "buffer",
     },
   },
+
   define: {
     "process.env": {},
     global: "globalThis",
   },
+
   optimizeDeps: {
     include: ["buffer", "process"],
   },
+
   server: {
     port: 5173,
     open: true,
   },
-}));
 
+  preview: {
+    port: 4173,
+  },
+}));

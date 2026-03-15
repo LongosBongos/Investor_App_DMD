@@ -1,4 +1,6 @@
 Contact: mailto:support@diemarkdigital.org
-Expires: 2026-01-01T00:00:00Z
+Expires: 2027-03-15T00:00:00Z
 Preferred-Languages: de, en
 Canonical: https://longosbongos.github.io/Investor_App_DMD/.well-known/security.txt
+Policy: https://longosbongos.github.io/Investor_App_DMD/
+Acknowledgments: https://longosbongos.github.io/Investor_App_DMD/

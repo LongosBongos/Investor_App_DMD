@@ -1,74 +1,132 @@
 // src/forumClient.ts
-// Forum Client – API first, fallback to localStorage (DEV/WIP)
+// Hardened forum client for Investor_App_DMD
+// No localStorage fallback in production path.
+// API-only. If no backend is configured, read/write stays disabled.
 
 export type ForumThread = {
   id: string;
   title: string;
   body: string;
-  author: string; // wallet pubkey
+  author: string;
   tags: string[];
-  ts: number; // unix seconds
+  ts: number;
 };
 
-const LS_KEY = "dmd_forum_threads_v1";
+export type ForumPostPayload = {
+  wallet: string;
+  title: string;
+  body: string;
+  tags: string[];
+};
 
-function nowSec() {
-  return Math.floor(Date.now() / 1000);
+const HTTP_TIMEOUT_MS = 7000;
+const TITLE_MAX = 120;
+const BODY_MAX = 5000;
+const TAG_MAX = 10;
+const TAG_LEN_MAX = 24;
+
+function isRecord(x: unknown): x is Record<string, unknown> {
+  return typeof x === "object" && x !== null;
 }
 
-function uid() {
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+function normalizeString(x: unknown): string {
+  return typeof x === "string" ? x : "";
 }
 
-function safeJson<T>(x: unknown, fallback: T): T {
+function clampText(value: string, max: number): string {
+  return value.trim().replace(/\s+/g, " ").slice(0, max);
+}
+
+function normalizeBody(value: string, max: number): string {
+  return value.replace(/\r\n/g, "\n").trim().slice(0, max);
+}
+
+function normalizeTags(tags: string[]): string[] {
+  const clean = tags
+    .map((t) => clampText(String(t || ""), TAG_LEN_MAX))
+    .filter(Boolean)
+    .slice(0, TAG_MAX);
+
+  return [...new Set(clean)];
+}
+
+function normalizeThread(x: unknown): ForumThread | null {
+  if (!isRecord(x)) return null;
+
+  const id = normalizeString(x.id).trim();
+  const title = normalizeString(x.title).trim();
+  const body = normalizeString(x.body).trim();
+  const author = normalizeString(x.author).trim();
+  const ts = Number(x.ts);
+  const tags = Array.isArray(x.tags)
+    ? x.tags.map((t) => normalizeString(t)).filter(Boolean).slice(0, TAG_MAX)
+    : [];
+
+  if (!id || !title || !body || !author || !Number.isFinite(ts) || ts <= 0) {
+    return null;
+  }
+
+  return { id, title, body, author, ts, tags };
+}
+
+function normalizeThreadList(x: unknown): ForumThread[] {
+  if (!Array.isArray(x)) return [];
+  return x
+    .map(normalizeThread)
+    .filter((t): t is ForumThread => t !== null)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 200);
+}
+
+async function fetchJson(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = HTTP_TIMEOUT_MS
+): Promise<unknown> {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
+
   try {
-    return (typeof x === "string" ? JSON.parse(x) : x) as T;
-  } catch {
-    return fallback;
+    const response = await fetch(url, {
+      ...init,
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+
+    const ct = response.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      throw new Error(`Non-JSON response (${ct})`);
+    }
+
+    return response.json();
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
-function lsRead(): ForumThread[] {
-  const raw = localStorage.getItem(LS_KEY);
-  const arr = safeJson<ForumThread[]>(raw ?? "[]", []);
-  return Array.isArray(arr) ? arr : [];
-}
+export function validateForumApiBase(apiBase = ""): string {
+  const base = apiBase.trim();
 
-function lsWrite(list: ForumThread[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(list.slice(0, 500)));
+  if (!base) {
+    throw new Error("Forum backend is not configured.");
+  }
+
+  if (!/^https?:\/\//i.test(base) && !base.startsWith("/")) {
+    throw new Error("Forum backend URL is invalid.");
+  }
+
+  return base.replace(/\/+$/, "");
 }
 
 export async function getThreads(apiBase = ""): Promise<ForumThread[]> {
-  // API attempt
-  if (apiBase) {
-    try {
-      const r = await fetch(`${apiBase}/api/forum/threads`, { cache: "no-store" });
-      if (r.ok) {
-        const j = await r.json();
-        return Array.isArray(j) ? j : [];
-      }
-    } catch {
-      // ignore -> fallback below
-    }
-  }
-
-  // fallback (local)
-  const list = lsRead();
-  list.sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
-  return list;
-}
-
-// Optional signing (future backend verification)
-export async function signMessageWithWallet(message: string): Promise<string> {
-  const anyWin = window as any;
-  const provider = anyWin?.solana;
-  if (!provider?.signMessage) throw new Error("No wallet 'signMessage' found");
-  const encoded = new TextEncoder().encode(message);
-  const { signature } = await provider.signMessage(encoded, "utf8");
-  // base58 encode
-  // @ts-ignore
-  const bs58 = (await import("bs58")).default;
-  return bs58.encode(signature);
+  const base = validateForumApiBase(apiBase);
+  const json = await fetchJson(`${base}/api/forum/threads`);
+  return normalizeThreadList(json);
 }
 
 export async function postThread(
@@ -77,56 +135,37 @@ export async function postThread(
   title: string,
   body: string,
   tags: string[] = []
-) {
-  const cleanTitle = (title || "").trim();
-  const cleanBody = (body || "").trim();
-  const cleanTags = (tags || []).map((t) => t.trim()).filter(Boolean).slice(0, 10);
+): Promise<ForumThread> {
+  const base = validateForumApiBase(apiBase);
 
-  if (!wallet) throw new Error("Wallet fehlt.");
+  const cleanWallet = String(wallet || "").trim();
+  const cleanTitle = clampText(String(title || ""), TITLE_MAX);
+  const cleanBody = normalizeBody(String(body || ""), BODY_MAX);
+  const cleanTags = normalizeTags(tags);
+
+  if (!cleanWallet) throw new Error("Wallet fehlt.");
   if (!cleanTitle) throw new Error("Titel fehlt.");
   if (!cleanBody) throw new Error("Beitrag fehlt.");
 
-  // API first (if provided and reachable)
-  if (apiBase) {
-    try {
-      const message = `Sign this to post on DMD Forum`;
-      // signature optional; backend may require later
-      let signature = "";
-      try {
-        signature = await signMessageWithWallet(message);
-      } catch {
-        signature = "";
-      }
-
-      const resp = await fetch(`${apiBase}/api/forum/thread`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet, message, signature, title: cleanTitle, body: cleanBody, tags: cleanTags }),
-      });
-
-      if (resp.ok) return resp.json();
-      // if API exists but rejects -> still show error (no silent fallback)
-      const txt = await resp.text().catch(() => "");
-      throw new Error(txt || `HTTP ${resp.status}`);
-    } catch (e) {
-      // If apiBase was set intentionally, we keep the error.
-      // If you want silent fallback even with apiBase, set apiBase="" in props.
-      throw e;
-    }
-  }
-
-  // Local fallback (DEV/WIP)
-  const list = lsRead();
-  const t: ForumThread = {
-    id: uid(),
+  const payload: ForumPostPayload = {
+    wallet: cleanWallet,
     title: cleanTitle,
     body: cleanBody,
-    author: wallet,
     tags: cleanTags,
-    ts: nowSec(),
   };
-  list.unshift(t);
-  lsWrite(list);
 
-  return t;
+  const json = await fetchJson(`${base}/api/forum/thread`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const thread = normalizeThread(json);
+  if (!thread) {
+    throw new Error("Ungültige Forum-Antwort vom Backend.");
+  }
+
+  return thread;
 }

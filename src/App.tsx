@@ -1,5 +1,7 @@
-// src/App.tsx — V3.5 Premium Edition (clean + App/Fair Value) — RPC Leak-Safe (minimal)
-// ====================================================================================
+// src/App.tsx
+// Investor_App_DMD — hardened active shell
+// Preserves the existing page structure and core UX,
+// but aligns runtime behavior with the current on-chain truth.
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -23,9 +25,10 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 import {
   Connection,
   Commitment,
+  LAMPORTS_PER_SOL,
+  PublicKey,
   Transaction,
   TransactionInstruction,
-  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 
 import idl from "./idl/dmd_anchor.json";
@@ -33,17 +36,18 @@ import { fetchSolUsd, computeDmdPricing } from "./price";
 
 import {
   buildIxCoder,
-  buildAccCoder,
   ixAutoWhitelistSelf,
   ixBuyDmd,
   ixClaimRewardV2,
   ixSwapExactSolForDmd,
-  ixSwapExactDmdForSol,
   findVaultPda,
+  findVaultConfigV2Pda,
   findBuyerStatePda,
+  findBuyerStateExtV2Pda,
   ataFor as ataOf,
   createAtaIx,
-  FOUNDER,
+  PROGRAM_ID,
+  PROTOCOL_OWNER,
   TREASURY,
   DMD_MINT,
 } from "./solana";
@@ -51,7 +55,6 @@ import {
 // UI Modules
 import Leaderboard from "./Leaderboard";
 import ForumView from "./ForumView";
-import ForumEditor from "./ForumEditor";
 import AirdropPreview from "./AirdropPreview";
 import TokenDistribution from "./TokenDistribution";
 import WelcomeOverlay from "./WelcomeOverlay";
@@ -61,12 +64,10 @@ import TxFeed from "./TxFeed";
 import "./index.css";
 
 // -------------------------
-// Vite Env Typing (no casts)
+// Vite Env Typing
 // -------------------------
 interface ImportMetaEnv {
   readonly VITE_RPC_URL?: string;
-
-  // optional backend controls (GH Pages safe)
   readonly VITE_BACKEND_ENABLED?: string;
   readonly VITE_BACKEND_URL?: string;
 }
@@ -75,17 +76,27 @@ interface ImportMeta {
 }
 
 // -------------------------
-// RPC (Leak-Safe, single source of truth)
+// Runtime constants (aligned to current contract)
+// -------------------------
+const HOLD_DURATION_SEC = 60 * 60 * 24 * 30;
+const CLAIM_INTERVAL_SEC = 60 * 60 * 24 * 90;
+const BUY_MIN_SOL = 0.1;
+const BUY_MAX_SOL = 100;
+const BUY_DAILY_LIMIT = 10;
+const DEX_PAIR = "6xBMvGzomHgPdWtD3V4JQ8rqji5EWtFDDoAyQhYsVVd2";
+
+// -------------------------
+// RPC (leak-safe)
 // -------------------------
 function getRpcUrl(): string {
-  const DEFAULT_RPC = "https://isabelle-2w7wuk-fast-mainnet.helius-rpc.com";
+  const DEFAULT_RPC = "https://api.mainnet-beta.solana.com";
 
   const envRpc = import.meta.env.VITE_RPC_URL?.trim();
   const rpc = envRpc && envRpc.length > 0 ? envRpc : DEFAULT_RPC;
 
   if (rpc.includes("api-key=") || rpc.includes("apiKey=")) {
     throw new Error(
-      "SECURITY: VITE_RPC_URL contains api-key. Remove it and use a keyless endpoint or server proxy."
+      "SECURITY: VITE_RPC_URL contains api-key. Remove it and use a keyless endpoint or a backend proxy."
     );
   }
 
@@ -93,14 +104,16 @@ function getRpcUrl(): string {
 }
 
 // -------------------------
-// Backend (GH Pages safe)
+// Backend (optional / GH Pages safe)
 // -------------------------
 function backendEnabled(): boolean {
   return (import.meta.env.VITE_BACKEND_ENABLED || "").trim() === "1";
 }
+
 function backendBase(): string {
   return (import.meta.env.VITE_BACKEND_URL || "").trim();
 }
+
 async function fetchBackendJson(path: string): Promise<unknown> {
   const base = backendBase();
   const url = base ? `${base}${path}` : path;
@@ -117,10 +130,8 @@ async function fetchBackendJson(path: string): Promise<unknown> {
 }
 
 // -------------------------
-// Dexscreener (DMD Market)
+// Dexscreener
 // -------------------------
-const DEX_PAIR = "6xBMvGzomHgPdWtD3V4JQ8rqji5EWtFDDoAyQhYsVVd2";
-
 type DexPairResponse = {
   pairs?: Array<{
     priceUsd?: string;
@@ -139,56 +150,15 @@ async function fetchDmdUsdFromDex(pairAddress: string): Promise<number> {
 }
 
 // -------------------------
-// Safe helpers (no casts)
+// Safe helpers
 // -------------------------
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null;
 }
 
-function readNumberField(obj: unknown, key: string): number | null {
-  if (!isRecord(obj)) return null;
-  const v = obj[key];
-
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "bigint") return Number(v);
-
-  if (isRecord(v) && typeof (v as any).toNumber === "function") {
-    const n = (v as any).toNumber();
-    return Number.isFinite(n) ? n : null;
-  }
-  if (isRecord(v) && typeof (v as any).toString === "function") {
-    const n = Number((v as any).toString());
-    return Number.isFinite(n) ? n : null;
-  }
-
-  return null;
-}
-
-function readBoolField(obj: unknown, key: string): boolean | null {
-  if (!isRecord(obj)) return null;
-  const v = obj[key];
-
-  if (typeof v === "boolean") return v;
-  if (typeof v === "number") return v !== 0;
-  if (typeof v === "bigint") return v !== 0n;
-
-  if (isRecord(v) && typeof (v as any).toNumber === "function") {
-    const n = (v as any).toNumber();
-    return Number.isFinite(n) ? n !== 0 : null;
-  }
-
-  return null;
-}
-
-type FeedRow = Record<string, unknown>;
-
-function toFeedRows(x: unknown): FeedRow[] {
+function toFeedRows(x: unknown): Record<string, unknown>[] {
   if (!Array.isArray(x)) return [];
-  const out: FeedRow[] = [];
-  for (const it of x) {
-    if (isRecord(it)) out.push(it);
-  }
-  return out;
+  return x.filter(isRecord);
 }
 
 function fmtUsd(x: number): string {
@@ -208,6 +178,225 @@ function fmtCountdown(sec: number): string {
     : `${pad(h)}:${pad(m)}:${pad(ss)}`;
 }
 
+function currentDayIndex(nowTs: number): number {
+  return Math.floor(nowTs / 86400);
+}
+
+function shortPk(pk: PublicKey | null | undefined): string {
+  if (!pk) return "—";
+  const s = pk.toBase58();
+  return `${s.slice(0, 4)}…${s.slice(-4)}`;
+}
+
+function readU64LE(view: DataView, offset: number): bigint {
+  const lo = view.getUint32(offset, true);
+  const hi = view.getUint32(offset + 4, true);
+  return (BigInt(hi) << 32n) + BigInt(lo);
+}
+
+function readBool(view: DataView, offset: number): boolean {
+  return view.getUint8(offset) !== 0;
+}
+
+function slippageToBps(s: string): number {
+  const n = Number(String(s || "").replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return 100;
+  const clamped = Math.max(0.1, Math.min(50, n));
+  return Math.floor(clamped * 100);
+}
+
+function normalizeErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+
+  if (raw.includes("SELL_DISABLED_FRONTEND")) {
+    return "Sell / DMD→SOL ist aktuell bewusst deaktiviert.";
+  }
+  if (raw.includes("BuyCooldownActive")) {
+    return "Buy-Cooldown aktiv. Bitte warte, bis der Cooldown abgelaufen ist.";
+  }
+  if (raw.includes("BuyDailyLimitExceeded")) {
+    return "Tageslimit erreicht. Weitere Buys sind vorübergehend gesperrt.";
+  }
+  if (raw.includes("LegacyClaimFlowDisabled")) {
+    return "Nur Claim V2 ist aktiv. Bitte App-Stand prüfen.";
+  }
+  if (raw.includes("SellTemporarilyDisabled")) {
+    return "Sell ist on-chain derzeit deaktiviert.";
+  }
+  if (raw.includes("InvalidTreasury")) {
+    return "Treasury-Konfiguration stimmt nicht mit der On-chain-Wahrheit überein.";
+  }
+  if (raw.includes("InvalidOwner")) {
+    return "Owner-Konfiguration stimmt nicht mit der On-chain-Wahrheit überein.";
+  }
+  if (raw.includes("RewardTooSmall")) {
+    return "Reward aktuell zu klein für einen Claim.";
+  }
+  if (raw.includes("InsufficientVaultRewardLiquidity")) {
+    return "Nicht genug Reward-Liquidität im Vault.";
+  }
+
+  return raw;
+}
+
+// -------------------------
+// Manual decoders (do not trust old App IDL for reads)
+// -------------------------
+type VaultDecoded = {
+  owner: PublicKey;
+  totalSupply: bigint;
+  presaleSold: bigint;
+  initialPriceLamportsPer10k: bigint;
+  publicSaleActive: boolean;
+  mint: PublicKey;
+  mintDecimals: number;
+};
+
+type VaultConfigV2Decoded = {
+  treasury: PublicKey;
+  manualPriceLamportsPer10k: bigint;
+  dynamicPricingEnabled: boolean;
+  sellLive: boolean;
+};
+
+type BuyerStateDecoded = {
+  totalDmd: bigint;
+  lastRewardClaim: bigint;
+  lastSell: bigint;
+  holdingSince: bigint;
+  lastBuyDay: bigint;
+  buyCountToday: bigint;
+  whitelisted: boolean;
+};
+
+type BuyerStateExtV2Decoded = {
+  buyCooldownUntil: bigint;
+  sellWindowStart: bigint;
+  sellCountWindow: number;
+  extraSellApprovals: number;
+  firstClaimDone: boolean;
+};
+
+function decodeVault(data: Buffer | Uint8Array): VaultDecoded {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let offset = 8;
+
+  const owner = new PublicKey(data.slice(offset, offset + 32));
+  offset += 32;
+
+  const totalSupply = readU64LE(view, offset);
+  offset += 8;
+
+  const presaleSold = readU64LE(view, offset);
+  offset += 8;
+
+  const initialPriceLamportsPer10k = readU64LE(view, offset);
+  offset += 8;
+
+  const publicSaleActive = readBool(view, offset);
+  offset += 1;
+
+  const mint = new PublicKey(data.slice(offset, offset + 32));
+  offset += 32;
+
+  const mintDecimals = view.getUint8(offset);
+
+  return {
+    owner,
+    totalSupply,
+    presaleSold,
+    initialPriceLamportsPer10k,
+    publicSaleActive,
+    mint,
+    mintDecimals,
+  };
+}
+
+function decodeVaultConfigV2(data: Buffer | Uint8Array): VaultConfigV2Decoded {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let offset = 8;
+
+  const treasury = new PublicKey(data.slice(offset, offset + 32));
+  offset += 32;
+
+  const manualPriceLamportsPer10k = readU64LE(view, offset);
+  offset += 8;
+
+  const dynamicPricingEnabled = readBool(view, offset);
+  offset += 1;
+
+  const sellLive = readBool(view, offset);
+
+  return {
+    treasury,
+    manualPriceLamportsPer10k,
+    dynamicPricingEnabled,
+    sellLive,
+  };
+}
+
+function decodeBuyerState(data: Buffer | Uint8Array): BuyerStateDecoded {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let offset = 8;
+
+  const totalDmd = readU64LE(view, offset);
+  offset += 8;
+
+  const lastRewardClaim = readU64LE(view, offset);
+  offset += 8;
+
+  const lastSell = readU64LE(view, offset);
+  offset += 8;
+
+  const holdingSince = readU64LE(view, offset);
+  offset += 8;
+
+  const lastBuyDay = readU64LE(view, offset);
+  offset += 8;
+
+  const buyCountToday = readU64LE(view, offset);
+  offset += 8;
+
+  const whitelisted = readBool(view, offset);
+
+  return {
+    totalDmd,
+    lastRewardClaim,
+    lastSell,
+    holdingSince,
+    lastBuyDay,
+    buyCountToday,
+    whitelisted,
+  };
+}
+
+function decodeBuyerStateExtV2(data: Buffer | Uint8Array): BuyerStateExtV2Decoded {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let offset = 8;
+
+  const buyCooldownUntil = readU64LE(view, offset);
+  offset += 8;
+
+  const sellWindowStart = readU64LE(view, offset);
+  offset += 8;
+
+  const sellCountWindow = view.getUint8(offset);
+  offset += 1;
+
+  const extraSellApprovals = view.getUint8(offset);
+  offset += 1;
+
+  const firstClaimDone = readBool(view, offset);
+
+  return {
+    buyCooldownUntil,
+    sellWindowStart,
+    sellCountWindow,
+    extraSellApprovals,
+    firstClaimDone,
+  };
+}
+
 // -------------------------
 // Types
 // -------------------------
@@ -223,8 +412,14 @@ type ChartPoint = {
 // =============================================================
 // Router (Tabs)
 // =============================================================
-function NavBar(props: { active: Tab; setActive: (t: Tab) => void }) {
-  const items: Tab[] = ["Dashboard", "Trading", "Forum", "Leaderboard", "Airdrop"];
+function NavBar(props: {
+  active: Tab;
+  setActive: (t: Tab) => void;
+  showAirdrop: boolean;
+}) {
+  const items: Tab[] = props.showAirdrop
+    ? ["Dashboard", "Trading", "Forum", "Leaderboard", "Airdrop"]
+    : ["Dashboard", "Trading", "Forum", "Leaderboard"];
 
   return (
     <nav
@@ -235,6 +430,7 @@ function NavBar(props: { active: Tab; setActive: (t: Tab) => void }) {
         justifyContent: "center",
         marginTop: 30,
         marginBottom: 30,
+        flexWrap: "wrap",
       }}
     >
       {items.map((t) => (
@@ -266,6 +462,14 @@ function UIWrapper() {
   const [page, setPage] = useState<Tab>("Dashboard");
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
+  const isOwner =
+    connected && wallet.publicKey?.toBase58() === PROTOCOL_OWNER.toBase58();
+
+  useEffect(() => {
+    if (page === "Airdrop" && !isOwner) {
+      setPage("Dashboard");
+    }
+  }, [page, isOwner]);
 
   return (
     <>
@@ -308,14 +512,14 @@ function UIWrapper() {
         </div>
       )}
 
-      <NavBar active={page} setActive={setPage} />
+      <NavBar active={page} setActive={setPage} showAirdrop={isOwner} />
 
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         {page === "Dashboard" && <DashboardPage />}
         {page === "Trading" && <TradingPage />}
         {page === "Forum" && <ForumPage />}
         {page === "Leaderboard" && <LeaderboardPage />}
-        {page === "Airdrop" && <AirdropPage />}
+        {page === "Airdrop" && isOwner && <AirdropPage />}
       </div>
     </>
   );
@@ -327,6 +531,8 @@ function UIWrapper() {
 function DashboardPage() {
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
+  const isOwner =
+    connected && wallet.publicKey?.toBase58() === PROTOCOL_OWNER.toBase58();
 
   const [connection] = useState(() => {
     const rpc = getRpcUrl();
@@ -335,23 +541,20 @@ function DashboardPage() {
 
   const [treasurySol, setTreasurySol] = useState<number>(0);
   const [vaultDmd, setVaultDmd] = useState<number>(0);
-  const [founderDmd, setFounderDmd] = useState<number>(0);
+  const [ownerDmd, setOwnerDmd] = useState<number>(0);
 
   const [dmdUsd, setDmdUsd] = useState<number>(0);
   const [dmdAppUsd, setDmdAppUsd] = useState<number>(0);
   const [solUsd, setSolUsd] = useState<number>(0);
 
   const [chart, setChart] = useState<ChartPoint[]>([]);
+  const [pubFeed, setPubFeed] = useState<Record<string, unknown>[]>([]);
+  const [treFeed, setTreFeed] = useState<Record<string, unknown>[]>([]);
 
-  const [pubFeed, setPubFeed] = useState<FeedRow[]>([]);
-  const [treFeed, setTreFeed] = useState<FeedRow[]>([]);
-  const [foundFeed, setFoundFeed] = useState<FeedRow[]>([]);
-
-  const ixCoder = useMemo(() => buildIxCoder(idl), []);
-  const accCoder = useMemo(() => buildAccCoder(idl), []);
-
-  const isFounder =
-    connected && wallet.publicKey?.toBase58() === FOUNDER.toBase58();
+  const [vaultOwnerMatch, setVaultOwnerMatch] = useState<boolean | null>(null);
+  const [treasuryMatch, setTreasuryMatch] = useState<boolean | null>(null);
+  const [sellLive, setSellLive] = useState<boolean | null>(null);
+  const [dynamicPricingEnabled, setDynamicPricingEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -368,50 +571,54 @@ function DashboardPage() {
         if (sol > 0) setSolUsd(sol);
         if (dmdMarket > 0) setDmdUsd(dmdMarket);
 
-        let pubRaw: unknown = [];
-        let treRaw: unknown = [];
-        let fouRaw: unknown = [];
-
         if (backendEnabled()) {
-          [pubRaw, treRaw, fouRaw] = await Promise.all([
+          const [pubRaw, treRaw] = await Promise.all([
             fetchBackendJson("/api/events?limit=40").catch(() => []),
             fetchBackendJson("/api/treasury-events?limit=40").catch(() => []),
-            isFounder
-              ? fetchBackendJson("/api/founder-events?limit=40").catch(() => [])
-              : Promise.resolve([]),
           ]);
+          if (!alive) return;
+          setPubFeed(toFeedRows(pubRaw));
+          setTreFeed(toFeedRows(treRaw));
+        } else {
+          setPubFeed([]);
+          setTreFeed([]);
         }
 
-        if (!alive) return;
-        setPubFeed(toFeedRows(pubRaw));
-        setTreFeed(toFeedRows(treRaw));
-        setFoundFeed(toFeedRows(fouRaw));
-
         const vault = findVaultPda();
+        const vaultConfig = findVaultConfigV2Pda(vault);
         const vAta = ataOf(vault, DMD_MINT);
-        const fAta = ataOf(FOUNDER, DMD_MINT);
+        const ownerAta = ataOf(PROTOCOL_OWNER, DMD_MINT);
 
-        const [vaultAcc, treLamports, vaultBal, founderBal] = await Promise.all([
+        const [vaultInfo, configInfo, treLamports, vaultBal, ownerBal] = await Promise.all([
           connection.getAccountInfo(vault).catch(() => null),
+          connection.getAccountInfo(vaultConfig).catch(() => null),
           connection.getBalance(TREASURY).catch(() => 0),
-          connection
-            .getTokenAccountBalance(vAta)
-            .then((r) => Number(r.value.uiAmount ?? 0))
-            .catch(() => 0),
-          connection
-            .getTokenAccountBalance(fAta)
-            .then((r) => Number(r.value.uiAmount ?? 0))
-            .catch(() => 0),
+          connection.getTokenAccountBalance(vAta).then((r) => Number(r.value.uiAmount ?? 0)).catch(() => 0),
+          connection.getTokenAccountBalance(ownerAta).then((r) => Number(r.value.uiAmount ?? 0)).catch(() => 0),
         ]);
 
         if (!alive) return;
 
         let lamportsPer10k = 0;
-        if (vaultAcc?.data) {
-          const decoded = accCoder.decode("Vault", vaultAcc.data);
-          const n = readNumberField(decoded, "initial_price_sol");
-          if (typeof n === "number" && Number.isFinite(n) && n > 0) {
-            lamportsPer10k = n;
+        let ownerMatch: boolean | null = null;
+        let treMatch: boolean | null = null;
+        let nextSellLive: boolean | null = null;
+        let nextDynamicPricingEnabled: boolean | null = null;
+
+        if (vaultInfo?.data) {
+          const vaultDecoded = decodeVault(vaultInfo.data);
+          lamportsPer10k = Number(vaultDecoded.initialPriceLamportsPer10k);
+          ownerMatch = vaultDecoded.owner.equals(PROTOCOL_OWNER);
+        }
+
+        if (configInfo?.data) {
+          const configDecoded = decodeVaultConfigV2(configInfo.data);
+          treMatch = configDecoded.treasury.equals(TREASURY);
+          nextSellLive = configDecoded.sellLive;
+          nextDynamicPricingEnabled = configDecoded.dynamicPricingEnabled;
+
+          if (Number(configDecoded.manualPriceLamportsPer10k) > 0) {
+            lamportsPer10k = Number(configDecoded.manualPriceLamportsPer10k);
           }
         }
 
@@ -428,8 +635,12 @@ function DashboardPage() {
         if (app > 0) setDmdAppUsd(app);
 
         setVaultDmd(vaultBal);
-        setFounderDmd(founderBal);
+        setOwnerDmd(ownerBal);
         setTreasurySol(treLamports / LAMPORTS_PER_SOL);
+        setVaultOwnerMatch(ownerMatch);
+        setTreasuryMatch(treMatch);
+        setSellLive(nextSellLive);
+        setDynamicPricingEnabled(nextDynamicPricingEnabled);
 
         setChart((prev) => [
           ...prev.slice(-200),
@@ -445,13 +656,16 @@ function DashboardPage() {
       }
     }
 
-    pull();
-    const iv = window.setInterval(pull, 5000);
+    void pull();
+    const iv = window.setInterval(() => {
+      void pull();
+    }, 5000);
+
     return () => {
       alive = false;
       window.clearInterval(iv);
     };
-  }, [connection, isFounder, accCoder, ixCoder]);
+  }, [connection]);
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -467,22 +681,20 @@ function DashboardPage() {
         </div>
 
         <div className="card p-xl">
-          <div className="card-title">Founder (DMD)</div>
-          <div className="card-value">{founderDmd.toLocaleString()}</div>
+          <div className="card-title">Protocol Owner (DMD)</div>
+          <div className="card-value">{ownerDmd.toLocaleString()}</div>
         </div>
       </div>
 
       <div style={{ marginTop: 18 }} className="grid-3">
         <div className="card p-md">
-          <div className="card-title">DMD Price (USD)</div>
+          <div className="card-title">DMD Price (DEX)</div>
           <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : "—"}</div>
         </div>
 
         <div className="card p-md">
-          <div className="card-title">DMD App Value (USD)</div>
-          <div className="card-value">
-            {dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}
-          </div>
+          <div className="card-title">DMD App Value</div>
+          <div className="card-value">{dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}</div>
         </div>
 
         <div className="card p-md">
@@ -491,11 +703,61 @@ function DashboardPage() {
         </div>
       </div>
 
+      <div className="grid-3" style={{ marginTop: 18 }}>
+        <div className="card p-md">
+          <div className="card-title">Vault Owner Match</div>
+          <div className="card-value">
+            {vaultOwnerMatch == null ? "—" : vaultOwnerMatch ? "YES" : "NO"}
+          </div>
+        </div>
+
+        <div className="card p-md">
+          <div className="card-title">Treasury Match</div>
+          <div className="card-value">
+            {treasuryMatch == null ? "—" : treasuryMatch ? "YES" : "NO"}
+          </div>
+        </div>
+
+        <div className="card p-md">
+          <div className="card-title">Sell Status</div>
+          <div className="card-value">
+            {sellLive == null ? "—" : sellLive ? "LIVE" : "BLOCKED"}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-3" style={{ marginTop: 18 }}>
+        <div className="card p-md">
+          <div className="card-title">Pricing Mode</div>
+          <div className="card-value">
+            {dynamicPricingEnabled == null
+              ? "—"
+              : dynamicPricingEnabled
+              ? "Dynamic"
+              : "Manual"}
+          </div>
+        </div>
+
+        <div className="card p-md">
+          <div className="card-title">Program</div>
+          <div className="card-value" style={{ fontSize: 14 }}>
+            {shortPk(PROGRAM_ID)}
+          </div>
+        </div>
+
+        <div className="card p-md">
+          <div className="card-title">Mint</div>
+          <div className="card-value" style={{ fontSize: 14 }}>
+            {shortPk(DMD_MINT)}
+          </div>
+        </div>
+      </div>
+
       <div style={{ marginTop: 40 }}>
         <TokenDistribution
           vault={vaultDmd}
           treasury={treasurySol}
-          founder={founderDmd}
+          founder={ownerDmd}
         />
       </div>
 
@@ -506,7 +768,21 @@ function DashboardPage() {
       <div className="grid-3" style={{ marginTop: 40 }}>
         <TxFeed title="Public Feed" rows={pubFeed} />
         <TxFeed title="Treasury Feed" rows={treFeed} />
-        {isFounder && <TxFeed title="Founder Feed" rows={foundFeed} />}
+        {isOwner ? (
+          <div className="panel" style={{ padding: 20 }}>
+            <div className="panel-title">Protocol Notice</div>
+            <p className="small muted" style={{ lineHeight: 1.6 }}>
+              Founder-/Owner-spezifische Feeds sind absichtlich nicht Teil des öffentlichen Investor-Flows.
+            </p>
+          </div>
+        ) : (
+          <div className="panel" style={{ padding: 20 }}>
+            <div className="panel-title">Status</div>
+            <p className="small muted" style={{ lineHeight: 1.6 }}>
+              On-chain state is the source of truth. The app shows a conservative public surface.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -525,22 +801,20 @@ function TradingPage() {
   });
 
   const ixCoder = useMemo(() => buildIxCoder(idl), []);
-  const accCoder = useMemo(() => buildAccCoder(idl), []);
 
   const [status, setStatus] = useState<string>("");
   const [amountSol, setAmountSol] = useState<string>("1.0");
   const [amountDmd, setAmountDmd] = useState<string>("10000");
   const [slippagePct, setSlippagePct] = useState<string>("1.0");
 
-  const [buyerState, setBuyerState] = useState<unknown>(null);
+  const [buyerState, setBuyerState] = useState<BuyerStateDecoded | null>(null);
+  const [buyerExt, setBuyerExt] = useState<BuyerStateExtV2Decoded | null>(null);
   const [whitelisted, setWhitelisted] = useState<boolean>(false);
-
-  const HOLD_DURATION_SEC = 60 * 60 * 24 * 30;
-  const CLAIM_INTERVAL_SEC = 60 * 60 * 24 * 90;
 
   const [treasurySol, setTreasurySol] = useState<number>(0);
   const [priceLamports10k, setPriceLamports10k] = useState<number | null>(null);
   const [vaultDmd, setVaultDmd] = useState<number | null>(null);
+  const [sellLive, setSellLive] = useState<boolean>(false);
 
   const [walletDmd, setWalletDmd] = useState<number>(0);
   const [dmdMarketUsd, setDmdMarketUsd] = useState<number>(0);
@@ -552,74 +826,129 @@ function TradingPage() {
     return () => window.clearInterval(iv);
   }, []);
 
-  const claimView = useMemo(() => {
-    if (!buyerState) return { ok: false, text: "—" };
+  const policyView = useMemo(() => {
+    const result = {
+      buyCooldownLeft: 0,
+      buyCountToday: 0,
+      buyLimitReached: false,
+      holdReadyAt: 0,
+      intervalReadyAt: 0,
+      claimReady: false,
+      claimText: "—",
+      dailyCountText: "—",
+    };
 
-    const holdSince = readNumberField(buyerState, "holding_since") ?? 0;
-    const lastClaim = readNumberField(buyerState, "last_reward_claim") ?? 0;
+    if (!buyerState) return result;
 
-    const holdReadyAt = holdSince > 0 ? holdSince + HOLD_DURATION_SEC : 0;
-    const intervalReadyAt = lastClaim > 0 ? lastClaim + CLAIM_INTERVAL_SEC : 0;
+    const holdSince = Number(buyerState.holdingSince);
+    const lastClaim = Number(buyerState.lastRewardClaim);
+    const lastBuyDay = Number(buyerState.lastBuyDay);
+    const buyCountToday = Number(buyerState.buyCountToday);
+    const today = currentDayIndex(nowTs);
 
-    const readyAt = Math.max(holdReadyAt, intervalReadyAt);
-    if (readyAt <= 0) return { ok: false, text: "—" };
+    result.buyCountToday = lastBuyDay === today ? buyCountToday : 0;
+    result.buyLimitReached = result.buyCountToday >= BUY_DAILY_LIMIT;
+    result.dailyCountText = `${result.buyCountToday}/${BUY_DAILY_LIMIT}`;
 
-    const left = readyAt - nowTs;
-    const ok = left <= 0;
+    if (buyerExt) {
+      const cooldownUntil = Number(buyerExt.buyCooldownUntil);
+      result.buyCooldownLeft = Math.max(0, cooldownUntil - nowTs);
+    }
 
-    return { ok, text: ok ? "✅ Claim verfügbar" : `⏳ Claim in ${fmtCountdown(left)}` };
-  }, [buyerState, nowTs]);
+    result.holdReadyAt = holdSince > 0 ? holdSince + HOLD_DURATION_SEC : 0;
+    result.intervalReadyAt = lastClaim > 0 ? lastClaim + CLAIM_INTERVAL_SEC : 0;
+
+    const readyAt = Math.max(result.holdReadyAt, result.intervalReadyAt);
+    if (readyAt > 0) {
+      const left = readyAt - nowTs;
+      result.claimReady = left <= 0;
+      result.claimText = result.claimReady
+        ? "✅ Claim verfügbar"
+        : `⏳ Claim in ${fmtCountdown(left)}`;
+    }
+
+    return result;
+  }, [buyerState, buyerExt, nowTs]);
 
   useEffect(() => {
     let alive = true;
 
     async function pull() {
-      if (!connected || !wallet.publicKey) return;
+      if (!connected || !wallet.publicKey) {
+        if (!alive) return;
+        setBuyerState(null);
+        setBuyerExt(null);
+        setWhitelisted(false);
+        setWalletDmd(0);
+        setWalletInternalValueUsd(0);
+        return;
+      }
 
       try {
+        const buyer = wallet.publicKey;
         const vault = findVaultPda();
-        const bs = findBuyerStatePda(vault, wallet.publicKey);
+        const vaultConfig = findVaultConfigV2Pda(vault);
+        const bs = findBuyerStatePda(vault, buyer);
+        const bsExt = findBuyerStateExtV2Pda(vault, buyer);
 
         const market = await fetchDmdUsdFromDex(DEX_PAIR).catch(() => 0);
         if (alive && market > 0) setDmdMarketUsd(market);
 
-        const buyerAta = ataOf(wallet.publicKey, DMD_MINT);
+        const buyerAta = ataOf(buyer, DMD_MINT);
         const bBal = await connection
           .getTokenAccountBalance(buyerAta)
           .then((r) => Number(r.value.uiAmount ?? 0))
           .catch(() => 0);
         if (alive) setWalletDmd(bBal);
 
-        const ai = await connection.getAccountInfo(bs).catch(() => null);
+        const [buyerInfo, buyerExtInfo, vaultInfo, configInfo] = await Promise.all([
+          connection.getAccountInfo(bs).catch(() => null),
+          connection.getAccountInfo(bsExt).catch(() => null),
+          connection.getAccountInfo(vault).catch(() => null),
+          connection.getAccountInfo(vaultConfig).catch(() => null),
+        ]);
+
         if (!alive) return;
 
-        if (ai?.data) {
-          const decoded = accCoder.decode("BuyerState", ai.data);
-          const wl = readBoolField(decoded, "whitelisted");
+        if (buyerInfo?.data) {
+          const decoded = decodeBuyerState(buyerInfo.data);
           setBuyerState(decoded);
-          setWhitelisted(wl === true);
+          setWhitelisted(decoded.whitelisted);
         } else {
           setBuyerState(null);
           setWhitelisted(false);
         }
 
-        const vaultAcc = await connection.getAccountInfo(vault).catch(() => null);
-        if (!alive) return;
+        if (buyerExtInfo?.data) {
+          setBuyerExt(decodeBuyerStateExtV2(buyerExtInfo.data));
+        } else {
+          setBuyerExt(null);
+        }
 
         let nextPriceLamports10k = 0;
-
-        if (vaultAcc?.data) {
-          const decoded = accCoder.decode("Vault", vaultAcc.data);
-          const n = readNumberField(decoded, "initial_price_sol");
-          nextPriceLamports10k = typeof n === "number" ? n : 0;
-          setPriceLamports10k(nextPriceLamports10k);
+        if (vaultInfo?.data) {
+          const vaultDecoded = decodeVault(vaultInfo.data);
+          nextPriceLamports10k = Number(vaultDecoded.initialPriceLamportsPer10k);
         }
+
+        if (configInfo?.data) {
+          const configDecoded = decodeVaultConfigV2(configInfo.data);
+          setSellLive(configDecoded.sellLive);
+          if (Number(configDecoded.manualPriceLamportsPer10k) > 0) {
+            nextPriceLamports10k = Number(configDecoded.manualPriceLamportsPer10k);
+          }
+        } else {
+          setSellLive(false);
+        }
+
+        setPriceLamports10k(nextPriceLamports10k > 0 ? nextPriceLamports10k : null);
 
         const vAta = ataOf(vault, DMD_MINT);
         const balance = await connection
           .getTokenAccountBalance(vAta)
           .then((r) => Number(r.value.uiAmount ?? 0))
           .catch(() => 0);
+
         const treLam = await connection.getBalance(TREASURY).catch(() => 0);
 
         const pricing = await computeDmdPricing({
@@ -630,12 +959,10 @@ function TradingPage() {
         });
 
         const appUsd = pricing.usdPerDmdFinal ?? 0;
-
         let internalValue = 0;
 
         if (bBal > 0 && appUsd > 0) {
           const baseValue = bBal * appUsd;
-
           const treasuryUsd =
             pricing.solUsd > 0 ? (treLam / LAMPORTS_PER_SOL) * pricing.solUsd : 0;
 
@@ -658,24 +985,49 @@ function TradingPage() {
       }
     }
 
-    pull();
-    const iv = window.setInterval(pull, 8000);
+    void pull();
+    const iv = window.setInterval(() => {
+      void pull();
+    }, 8000);
+
     return () => {
       alive = false;
       window.clearInterval(iv);
     };
-  }, [connection, connected, wallet.publicKey, accCoder]);
+  }, [connection, connected, wallet.publicKey]);
 
-  function slippageToBps(s: string): number {
-    const n = Number(String(s || "").replace(",", "."));
-    if (!Number.isFinite(n) || n <= 0) return 1;
-    const clamped = Math.max(0, Math.min(50, n));
-    return Math.max(1, Math.floor(clamped * 100));
+  async function ensureAtas(
+    buyer: PublicKey,
+    vault: PublicKey
+  ): Promise<TransactionInstruction[]> {
+    const vAta = ataOf(vault, DMD_MINT);
+    const bAta = ataOf(buyer, DMD_MINT);
+
+    const ixs: TransactionInstruction[] = [];
+    const [buyerInfo, vaultInfo] = await Promise.all([
+      connection.getAccountInfo(bAta),
+      connection.getAccountInfo(vAta),
+    ]);
+
+    if (!buyerInfo) ixs.push(createAtaIx(buyer, bAta, buyer, DMD_MINT));
+    if (!vaultInfo) ixs.push(createAtaIx(buyer, vAta, vault, DMD_MINT));
+
+    return ixs;
   }
 
   async function handleAutoWhitelist() {
     try {
-      if (!connected || !wallet.publicKey) return alert("Wallet verbinden.");
+      if (!connected || !wallet.publicKey) {
+        alert("Wallet verbinden.");
+        return;
+      }
+
+      const rawSol = Number(amountSol.replace(",", "."));
+      if (!Number.isFinite(rawSol) || rawSol < BUY_MIN_SOL) {
+        setStatus(`Auto-Whitelist erfordert mindestens ${BUY_MIN_SOL.toFixed(1)} SOL Kaufabsicht.`);
+        return;
+      }
+
       setStatus("Auto-Whitelist…");
 
       const ix = ixAutoWhitelistSelf(ixCoder, wallet.publicKey);
@@ -686,31 +1038,40 @@ function TradingPage() {
       const sig = await wallet.sendTransaction(tx, connection);
       setStatus(`Whitelist gesendet: ${sig}`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setStatus("Whitelist Fehler: " + msg);
+      setStatus("Whitelist Fehler: " + normalizeErrorMessage(e));
     }
   }
 
   async function handleBuy() {
     try {
-      if (!connected || !wallet.publicKey) return alert("Wallet verbinden.");
+      if (!connected || !wallet.publicKey) {
+        alert("Wallet verbinden.");
+        return;
+      }
+
+      const rawSol = Number(amountSol.replace(",", "."));
+      if (!Number.isFinite(rawSol) || rawSol < BUY_MIN_SOL || rawSol > BUY_MAX_SOL) {
+        setStatus(`Buy-Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
+        return;
+      }
+
+      if (!whitelisted) {
+        setStatus("Wallet ist nicht freigeschaltet.");
+        return;
+      }
+
+      if (policyView.buyCooldownLeft > 0) {
+        setStatus(`Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`);
+        return;
+      }
+
       setStatus("Buy…");
 
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
-      const vAta = ataOf(vault, DMD_MINT);
-      const bAta = ataOf(buyer, DMD_MINT);
+      const ixs = await ensureAtas(buyer, vault);
 
-      const ixs: TransactionInstruction[] = [];
-      const [buyerInfo, vaultInfo] = await Promise.all([
-        connection.getAccountInfo(bAta),
-        connection.getAccountInfo(vAta),
-      ]);
-
-      if (!buyerInfo) ixs.push(createAtaIx(buyer, bAta, buyer, DMD_MINT));
-      if (!vaultInfo) ixs.push(createAtaIx(buyer, vAta, vault, DMD_MINT));
-
-      const lamports = Math.floor(parseFloat(amountSol) * LAMPORTS_PER_SOL);
+      const lamports = Math.floor(rawSol * LAMPORTS_PER_SOL);
       const buyIx = ixBuyDmd(ixCoder, buyer, lamports);
 
       const tx = new Transaction();
@@ -722,33 +1083,54 @@ function TradingPage() {
       const sig = await wallet.sendTransaction(tx, connection);
       setStatus(`Buy gesendet: ${sig}`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setStatus("Buy Fehler: " + msg);
+      setStatus("Buy Fehler: " + normalizeErrorMessage(e));
     }
   }
 
   async function handleSwapSolToDmd() {
     try {
-      if (!connected || !wallet.publicKey) return alert("Wallet verbinden.");
-      setStatus("Swap SOL➜DMD…");
+      if (!connected || !wallet.publicKey) {
+        alert("Wallet verbinden.");
+        return;
+      }
+
+      const rawSol = Number(amountSol.replace(",", "."));
+      if (!Number.isFinite(rawSol) || rawSol < BUY_MIN_SOL || rawSol > BUY_MAX_SOL) {
+        setStatus(`SOL→DMD Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
+        return;
+      }
+
+      if (!whitelisted) {
+        setStatus("Wallet ist nicht freigeschaltet.");
+        return;
+      }
+
+      if (policyView.buyCooldownLeft > 0) {
+        setStatus(`Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`);
+        return;
+      }
+
+      if (!priceLamports10k || priceLamports10k <= 0) {
+        setStatus("Preisstatus noch nicht geladen. Bitte kurz erneut versuchen.");
+        return;
+      }
+
+      setStatus("Swap SOL→DMD…");
 
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
-      const vAta = ataOf(vault, DMD_MINT);
-      const bAta = ataOf(buyer, DMD_MINT);
+      const ixs = await ensureAtas(buyer, vault);
 
-      const ixs: TransactionInstruction[] = [];
-      const [buyerInfo, vaultInfo] = await Promise.all([
-        connection.getAccountInfo(bAta),
-        connection.getAccountInfo(vAta),
-      ]);
-
-      if (!buyerInfo) ixs.push(createAtaIx(buyer, bAta, buyer, DMD_MINT));
-      if (!vaultInfo) ixs.push(createAtaIx(buyer, vAta, vault, DMD_MINT));
-
-      const lamports = Math.floor(parseFloat(amountSol) * LAMPORTS_PER_SOL);
+      const lamports = Math.floor(rawSol * LAMPORTS_PER_SOL);
       const bps = slippageToBps(slippagePct);
-      const swapIx = ixSwapExactSolForDmd(ixCoder, buyer, lamports, bps);
+
+      const expectedOut = Math.floor((lamports * 10_000) / priceLamports10k);
+      const minOutDmd = Math.max(
+        1,
+        Math.floor((expectedOut * (10_000 - bps)) / 10_000)
+      );
+
+      const swapIx = ixSwapExactSolForDmd(ixCoder, buyer, lamports, minOutDmd);
 
       const tx = new Transaction();
       ixs.forEach((ix) => tx.add(ix));
@@ -759,75 +1141,37 @@ function TradingPage() {
       const sig = await wallet.sendTransaction(tx, connection);
       setStatus(`Swap SOL→DMD: ${sig}`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setStatus("Swap Fehler: " + msg);
-    }
-  }
-
-  async function handleSwapDmdToSol() {
-    try {
-      if (!connected || !wallet.publicKey) return alert("Wallet verbinden.");
-      setStatus("Swap DMD➜SOL…");
-
-      const buyer = wallet.publicKey;
-      const vault = findVaultPda();
-      const vAta = ataOf(vault, DMD_MINT);
-      const bAta = ataOf(buyer, DMD_MINT);
-
-      const ixs: TransactionInstruction[] = [];
-      const [buyerInfo, vaultInfo] = await Promise.all([
-        connection.getAccountInfo(bAta),
-        connection.getAccountInfo(vAta),
-      ]);
-
-      if (!buyerInfo) ixs.push(createAtaIx(buyer, bAta, buyer, DMD_MINT));
-      if (!vaultInfo) ixs.push(createAtaIx(buyer, vAta, vault, DMD_MINT));
-
-      const amo = Math.floor(parseFloat(amountDmd));
-      const bps = slippageToBps(slippagePct);
-      const swapIx = ixSwapExactDmdForSol(ixCoder, buyer, amo, bps);
-
-      const tx = new Transaction();
-      ixs.forEach((ix) => tx.add(ix));
-      tx.add(swapIx);
-      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-      tx.feePayer = buyer;
-
-      const sig = await wallet.sendTransaction(tx, connection);
-      setStatus(`Swap DMD→SOL: ${sig}`);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setStatus("Swap Fehler: " + msg);
+      setStatus("Swap Fehler: " + normalizeErrorMessage(e));
     }
   }
 
   async function handleClaim() {
     try {
-      if (!connected || !wallet.publicKey) return alert("Wallet verbinden.");
-      if (!buyerState) return setStatus("Kein BuyerState.");
+      if (!connected || !wallet.publicKey) {
+        alert("Wallet verbinden.");
+        return;
+      }
 
-      const now = Math.floor(Date.now() / 1000);
-      const holdSince = readNumberField(buyerState, "holding_since") ?? 0;
-      const lastClaim = readNumberField(buyerState, "last_reward_claim") ?? 0;
+      if (!buyerState) {
+        setStatus("Kein BuyerState vorhanden.");
+        return;
+      }
 
-      if (now - holdSince < HOLD_DURATION_SEC) return setStatus("Hold 30 Tage nicht erfüllt.");
-      if (lastClaim && now - lastClaim < CLAIM_INTERVAL_SEC) return setStatus("Claim erst nach 90 Tagen.");
+      if (!buyerExt) {
+        setStatus("BuyerStateExtV2 fehlt. Bitte zuerst V2-Status initialisieren lassen.");
+        return;
+      }
+
+      if (!policyView.claimReady) {
+        setStatus(policyView.claimText || "Claim noch nicht verfügbar.");
+        return;
+      }
 
       setStatus("Claim…");
 
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
-      const vAta = ataOf(vault, DMD_MINT);
-      const bAta = ataOf(buyer, DMD_MINT);
-
-      const ixs: TransactionInstruction[] = [];
-      const [buyerInfo, vaultInfo] = await Promise.all([
-        connection.getAccountInfo(bAta),
-        connection.getAccountInfo(vAta),
-      ]);
-
-      if (!buyerInfo) ixs.push(createAtaIx(buyer, bAta, buyer, DMD_MINT));
-      if (!vaultInfo) ixs.push(createAtaIx(buyer, vAta, vault, DMD_MINT));
+      const ixs = await ensureAtas(buyer, vault);
 
       const ix = ixClaimRewardV2(ixCoder, buyer);
 
@@ -840,8 +1184,7 @@ function TradingPage() {
       const sig = await wallet.sendTransaction(tx, connection);
       setStatus(`Claim gesendet: ${sig}`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setStatus("Claim Fehler: " + msg);
+      setStatus("Claim Fehler: " + normalizeErrorMessage(e));
     }
   }
 
@@ -851,7 +1194,7 @@ function TradingPage() {
         <div className="panel" style={{ textAlign: "center", padding: 20 }}>
           <div className="panel-title">Wallet verbinden</div>
           <p className="small muted">
-            Verbinde deine Wallet über den Button unten, um DMD handeln zu können.
+            Verbinde deine Wallet über den Button unten, um DMD sicher zu nutzen.
           </p>
         </div>
       )}
@@ -881,33 +1224,59 @@ function TradingPage() {
             </div>
 
             <div className="kv">
-              <span>DMD Market (Dex)</span>
+              <span>DMD Market (DEX)</span>
               <b>{dmdMarketUsd > 0 ? `$${dmdMarketUsd.toFixed(6)}` : "—"}</b>
             </div>
 
             <div className="kv">
-              <span>Wert deiner DMD (Dex)</span>
+              <span>Wert deiner DMD (DEX)</span>
               <b>{dmdMarketUsd > 0 ? fmtUsd(walletDmd * dmdMarketUsd) : "—"}</b>
             </div>
 
-            <div className="kv" style={{ marginTop: 8 }}>
+            <div className="kv">
               <span>Claim Counter</span>
-              <b style={{ color: claimView.ok ? "#14f195" : undefined }}>
-                {claimView.text}
+              <b style={{ color: policyView.claimReady ? "#14f195" : undefined }}>
+                {policyView.claimText}
               </b>
             </div>
 
+            <div className="kv">
+              <span>Buy Count Today</span>
+              <b>{policyView.dailyCountText}</b>
+            </div>
+
+            <div className="kv">
+              <span>Buy Cooldown</span>
+              <b>
+                {policyView.buyCooldownLeft > 0
+                  ? fmtCountdown(policyView.buyCooldownLeft)
+                  : "frei"}
+              </b>
+            </div>
+
+            <div className="kv">
+              <span>Treasury (SOL)</span>
+              <b>{treasurySol.toFixed(2)}</b>
+            </div>
+
+            <div className="kv">
+              <span>Vault (DMD)</span>
+              <b>{vaultDmd != null ? vaultDmd.toLocaleString() : "—"}</b>
+            </div>
+
             <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
-              Hinweis: Der Counter basiert on-chain auf deinem BuyerState (holding_since / last_reward_claim).
-              Maßgeblich ist die Blockchain.
+              Die Anzeige basiert konservativ auf On-chain BuyerState, BuyerStateExtV2 und VaultConfigV2.
+              Maßgeblich bleibt die Blockchain.
             </div>
           </div>
 
           <div className="panel" style={{ marginBottom: 20 }}>
             <div className="panel-title">Trading Hinweis</div>
             <div className="small" style={{ lineHeight: 1.6 }}>
-              <b>Verkauf (Sell) wird vorläufig über Phantom/DEX gesteuert</b> – nicht über die DMD App,
-              falls Bedarf besteht. Dadurch bleibt der Flow stabil und sicher im Walletbrowser.
+              <b>Sell / DMD→SOL ist in der Investor App absichtlich deaktiviert.</b>
+              <br />
+              Die aktuelle On-chain-Policy behandelt Sell als blockierten Pfad.
+              Diese App bietet deshalb nur sichere Buy-/Claim-Wege an.
             </div>
           </div>
 
@@ -916,7 +1285,7 @@ function TradingPage() {
               <div className="panel-title">Whitelist</div>
               <p className="small muted">Du bist noch nicht freigeschaltet.</p>
               <button className="btn" onClick={handleAutoWhitelist}>
-                Auto-Whitelist (≥ 0,5 SOL)
+                Auto-Whitelist
               </button>
             </div>
           )}
@@ -925,6 +1294,7 @@ function TradingPage() {
             <div className="grid-2">
               <div className="panel">
                 <div className="panel-title">SOL → DMD</div>
+
                 <label className="small muted">SOL</label>
                 <input
                   className="input"
@@ -941,6 +1311,12 @@ function TradingPage() {
                   onChange={(e) => setSlippagePct(e.target.value)}
                 />
 
+                <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
+                  Buy Bereich: {BUY_MIN_SOL} bis {BUY_MAX_SOL} SOL.
+                  <br />
+                  Tageslimit: {BUY_DAILY_LIMIT} Buys. Danach kann ein Cooldown greifen.
+                </div>
+
                 <div className="btn-grid" style={{ marginTop: 15 }}>
                   <button className="action-btn" onClick={handleBuy}>
                     BUY DMD
@@ -953,11 +1329,13 @@ function TradingPage() {
 
               <div className="panel">
                 <div className="panel-title">DMD → SOL</div>
+
                 <label className="small muted">DMD</label>
                 <input
                   className="input"
                   value={amountDmd}
                   onChange={(e) => setAmountDmd(e.target.value)}
+                  disabled
                 />
 
                 <label className="small muted" style={{ marginTop: 10 }}>
@@ -967,17 +1345,24 @@ function TradingPage() {
                   className="input input--sm"
                   value={slippagePct}
                   onChange={(e) => setSlippagePct(e.target.value)}
+                  disabled
                 />
 
+                <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
+                  Sell bleibt bewusst deaktiviert, bis die On-chain-Policy ihn wieder freigibt.
+                  <br />
+                  Claim bleibt verfügbar, sobald die Bedingungen erfüllt sind.
+                </div>
+
                 <div className="btn-grid" style={{ marginTop: 15 }}>
-                  <button className="action-btn swap-btn" onClick={handleSwapDmdToSol}>
-                    SWAP DMD→SOL
+                  <button className="action-btn swap-btn" disabled title="Sell deaktiviert">
+                    SWAP DMD→SOL DISABLED
                   </button>
                   <button
                     className="action-btn"
                     onClick={handleClaim}
-                    disabled={!claimView.ok}
-                    title={!claimView.ok ? "Noch nicht verfügbar" : "Claim verfügbar"}
+                    disabled={!policyView.claimReady || !buyerExt || sellLive}
+                    title={!policyView.claimReady ? "Noch nicht verfügbar" : "Claim verfügbar"}
                   >
                     CLAIM
                   </button>
@@ -1003,6 +1388,7 @@ function TradingPage() {
 function ForumPage() {
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
+  const backendOn = backendEnabled();
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -1016,13 +1402,21 @@ function ForumPage() {
         </div>
       )}
 
-      {connected && (
-        <>
-          <ForumView walletPk={wallet.publicKey?.toBase58()} />
-          <div style={{ marginTop: 30 }}>
-            <ForumEditor walletPk={wallet.publicKey?.toBase58()} />
-          </div>
-        </>
+      {connected && !backendOn && (
+        <div className="panel" style={{ padding: 20 }}>
+          <p className="small muted" style={{ lineHeight: 1.6 }}>
+            Das Forum ist ohne Backend absichtlich im Schreibmodus deaktiviert.
+            <br />
+            Grund: Kein lokaler LocalStorage-Fallback im produktiven Investor-Flow.
+          </p>
+        </div>
+      )}
+
+      {connected && backendOn && (
+        <ForumView
+          walletPk={wallet.publicKey?.toBase58()}
+          apiBase={backendBase()}
+        />
       )}
     </div>
   );
@@ -1043,19 +1437,18 @@ function LeaderboardPage() {
 }
 
 // =============================================================
-// AIRDROP PAGE (Founder only)
+// AIRDROP PAGE (Protocol Owner only)
 // =============================================================
 function AirdropPage() {
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
-
-  const isFounder =
-    connected && wallet.publicKey?.toBase58() === FOUNDER.toBase58();
+  const isOwner =
+    connected && wallet.publicKey?.toBase58() === PROTOCOL_OWNER.toBase58();
 
   return (
     <div style={{ marginTop: 20 }}>
       <div className="panel-title" style={{ color: "var(--gold)", marginBottom: 20 }}>
-        Founder – Smart Airdrop Preview
+        Protocol Owner – Smart Airdrop Preview
       </div>
 
       {!connected && (
@@ -1064,13 +1457,13 @@ function AirdropPage() {
         </div>
       )}
 
-      {connected && !isFounder && (
+      {connected && !isOwner && (
         <div className="panel" style={{ padding: 20 }}>
-          <p className="small muted">Nur Founder können diesen Bereich sehen.</p>
+          <p className="small muted">Nur der aktuelle Protocol Owner kann diesen Bereich sehen.</p>
         </div>
       )}
 
-      {connected && isFounder && (
+      {connected && isOwner && (
         <div>
           <AirdropPreview />
         </div>
