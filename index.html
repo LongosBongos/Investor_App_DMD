@@ -13,15 +13,15 @@
 
     <meta
       name="description"
-      content="DIE MARK DIGITAL — Handelsplattform · Marktplatz auf Solana"
+      content="DIE MARK DIGITAL — Investor App auf Solana · Buy · Claim · Dashboard · Community."
     />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="DIE MARK DIGITAL — Handelsplattform" />
+    <meta property="og:title" content="DIE MARK DIGITAL — Investor App" />
 
     <meta
       property="og:description"
-      content="Buy • Sell • Claim • Swap — sicher & transparent auf Solana."
+      content="Buy · Claim · Dashboard · Community — konservativ, transparent und on-chain orientiert auf Solana."
     />
 
     <meta property="og:type" content="website" />
@@ -42,19 +42,15 @@
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-
-    <meta name="twitter:title" content="DIE MARK DIGITAL" />
-
+    <meta name="twitter:title" content="DIE MARK DIGITAL — Investor App" />
     <meta
       name="twitter:description"
-      content="Buy • Sell • Claim • Swap — sicher & transparent auf Solana."
+      content="Buy · Claim · Dashboard · Community — konservativ, transparent und on-chain orientiert auf Solana."
     />
-
     <meta
       name="twitter:image"
       content="https://longosbongos.github.io/Investor_App_DMD/og.png"
     />
-
     <meta name="twitter:site" content="@DieMarkDigital" />
     <meta name="twitter:creator" content="@DieMarkDigital" />
 
@@ -62,22 +58,24 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
 
-    <!-- FINANCE ELITE FONTS -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
     <link
-      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600;700;800&display=swap"
       rel="stylesheet"
     />
 
-    <title>DIE MARK DIGITAL — Handelsplattform</title>
+    <title>DIE MARK DIGITAL — Investor App</title>
 
     <style>
       .brand {
         display: flex;
         flex-direction: column;
+        align-items: center;
+        justify-content: center;
         line-height: 1.1;
+        text-align: center;
       }
 
       .brand__elite {
@@ -86,18 +84,15 @@
         font-size: clamp(22px, 2.4vw + 10px, 38px);
         letter-spacing: 0.08em;
         text-transform: uppercase;
-
         background: linear-gradient(
           180deg,
           #f5e6b3 0%,
           #d4af37 45%,
           #8a6a12 100%
         );
-
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
-
         text-shadow:
           0 0 18px rgba(212, 175, 55, 0.18),
           0 2px 24px rgba(0, 0, 0, 0.55);
@@ -105,7 +100,7 @@
 
       .subline {
         font-family: "Inter", sans-serif;
-        font-weight: 600;
+        font-weight: 700;
         font-size: 12px;
         letter-spacing: 0.18em;
         text-transform: uppercase;
@@ -115,32 +110,117 @@
 
       header {
         position: relative;
-        padding: 18px 24px;
+        padding: 18px 24px 16px;
         border-bottom: 1px solid rgba(212, 175, 55, 0.12);
-        overflow: visible;
-        z-index: 10;
-        background: transparent;
-      }
-
-      header::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: rgba(5, 7, 11, 0.6);
+        background: rgba(5, 7, 11, 0.72);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        z-index: -1;
+        z-index: 10;
+      }
+
+      .socials {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 16px;
+        margin-top: 16px;
+        min-height: 40px;
+        flex-wrap: wrap;
+      }
+
+      .social-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        text-decoration: none;
+        color: #f5f5f5;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow:
+          0 4px 20px rgba(0, 0, 0, 0.25),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        transition:
+          transform 0.18s ease,
+          box-shadow 0.18s ease,
+          border-color 0.18s ease,
+          background 0.18s ease;
+      }
+
+      .social-btn:hover {
+        transform: translateY(-2px);
+        border-color: rgba(212, 175, 55, 0.45);
+        background: rgba(212, 175, 55, 0.12);
+        box-shadow:
+          0 8px 26px rgba(0, 0, 0, 0.35),
+          0 0 0 1px rgba(212, 175, 55, 0.08) inset;
+      }
+
+      .social-btn svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top, rgba(212, 175, 55, 0.08), transparent 42%),
+          linear-gradient(180deg, #07090c 0%, #030406 100%);
+      }
+
+      #root {
+        min-height: calc(100vh - 170px);
+      }
+
+      footer {
+        text-align: center;
+        color: rgba(255, 255, 255, 0.42);
+        font-family: "Inter", sans-serif;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 24px 12px 28px;
+      }
+
+      @media (max-width: 900px) {
+        .socials {
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+      }
+
+      @media (max-width: 640px) {
+        header {
+          padding: 18px 16px 14px;
+        }
+
+        .brand__elite {
+          letter-spacing: 0.05em;
+        }
+
+        .subline {
+          font-size: 11px;
+          letter-spacing: 0.14em;
+        }
+
+        .social-btn {
+          width: 40px;
+          height: 40px;
+        }
       }
     </style>
-    <script type="module" crossorigin src="/Investor_App_DMD/assets/index-CAZI7qVX.js"></script>
-    <link rel="stylesheet" crossorigin href="/Investor_App_DMD/assets/index-hHQ7rKPd.css">
+    <script type="module" crossorigin src="/Investor_App_DMD/assets/index-D2U2ABUv.js"></script>
+    <link rel="stylesheet" crossorigin href="/Investor_App_DMD/assets/index-DL_ovFde.css">
   </head>
 
   <body>
     <header>
       <div class="brand">
         <span class="brand__elite">Die Mark Digital</span>
-        <div class="subline">HANDELSPLATTFORM · MARKTPLATZ</div>
+        <div class="subline">INVESTOR APP · SOLANA</div>
       </div>
 
       <nav class="socials" aria-label="Social Links">
@@ -160,18 +240,18 @@
           </svg>
         </a>
 
-        <!-- Instagram -->
+        <!-- Telegram -->
         <a
           class="social-btn"
-          href="https://www.instagram.com/dmdcoin"
+          href="https://t.me/diemarkDigitaloffiziell"
           target="_blank"
           rel="noreferrer"
-          aria-label="Instagram"
-          title="Instagram"
+          aria-label="Telegram"
+          title="Telegram"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
-              d="M7.75 2h8.5A4.25 4.25 0 0120.5 6.25v8.5A4.25 4.25 0 0116.25 19h-8.5A4.25 4.25 0 013.5 14.75v-8.5A4.25 4.25 0 017.75 2zm8.5 1.5h-8.5A2.75 2.75 0 004.5 6.25v8.5A2.75 2.75 0 007.25 17.5h8.5a2.75 2.75 0 002.75-2.75v-8.5A2.75 2.75 0 0016.25 3.5zM12 7.75a4.25 4.25 0 110 8.5 4.25 4.25 0 010-8.5zm0 1.5a2.75 2.75 0 100 5.5 2.75 2.75 0 000-5.5zm4.75-.75a.9.9 0 110 1.8.9.9 0 010-1.8z"
+              d="M21.94 4.66a1.5 1.5 0 00-1.67-.24L3.29 11.77c-.66.28-.63 1.23.04 1.47l4.34 1.58 1.66 5.25a1.04 1.04 0 001.82.33l2.45-3 4.79 3.49a1.5 1.5 0 002.35-.95l2.2-13.8a1.5 1.5 0 00-.99-1.48zM9.34 14.21l8.43-5.16-6.96 6.82-.28 2.5-1.19-4.16z"
             />
           </svg>
         </a>
@@ -213,7 +293,7 @@
     <div id="root"></div>
 
     <footer>
-      © <span id="y"></span> DIE MARK DIGITAL · Buy · Sell · Claim · Swap
+      © <span id="y"></span> DIE MARK DIGITAL · BUY · CLAIM · DASHBOARD · COMMUNITY
     </footer>
 
     <script>
