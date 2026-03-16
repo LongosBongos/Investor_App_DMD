@@ -197,7 +197,7 @@
           }
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "writable": true
         },
         {
@@ -493,13 +493,13 @@
               },
               {
                 "kind": "account",
-                "path": "founder"
+                "path": "protocol_owner"
               }
             ]
           }
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "writable": true,
           "signer": true
         },
@@ -508,7 +508,7 @@
           "writable": true
         },
         {
-          "name": "founder_token_account",
+          "name": "protocol_owner_token_account",
           "writable": true
         },
         {
@@ -691,7 +691,7 @@
           }
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "writable": true,
           "signer": true
         },
@@ -890,7 +890,7 @@
           "signer": true
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "writable": true
         },
         {
@@ -908,7 +908,7 @@
       ],
       "args": [
         {
-          "name": "_amount_tokens",
+          "name": "amount_tokens",
           "type": "u64"
         }
       ]
@@ -945,7 +945,7 @@
           }
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "signer": true
         }
       ],
@@ -1054,10 +1054,11 @@
         },
         {
           "name": "treasury",
-          "writable": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "writable": true
         },
         {
@@ -1076,11 +1077,11 @@
       ],
       "args": [
         {
-          "name": "_amount_in_dmd",
+          "name": "amount_in_dmd",
           "type": "u64"
         },
         {
-          "name": "_min_out_sol",
+          "name": "min_out_sol",
           "type": "u64"
         }
       ]
@@ -1182,7 +1183,7 @@
           "writable": true
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "writable": true
         },
         {
@@ -1246,7 +1247,7 @@
           }
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "signer": true
         }
       ],
@@ -1289,7 +1290,7 @@
           }
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "signer": true
         }
       ],
@@ -1363,7 +1364,7 @@
           }
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "signer": true
         }
       ],
@@ -1447,7 +1448,7 @@
           }
         },
         {
-          "name": "founder",
+          "name": "protocol_owner",
           "writable": true,
           "signer": true
         },
@@ -1551,8 +1552,8 @@
     },
     {
       "code": 6006,
-      "name": "InsufficientFounderInit",
-      "msg": "Founder Initialisierung zu niedrig."
+      "name": "InsufficientProtocolOwnerInit",
+      "msg": "Protocol Owner Initialisierung zu niedrig."
     },
     {
       "code": 6007,
@@ -1608,6 +1609,26 @@
       "code": 6017,
       "name": "InsufficientVaultRewardLiquidity",
       "msg": "Vault hat nicht genug DMD für die Reward-Auszahlung."
+    },
+    {
+      "code": 6018,
+      "name": "InsufficientTreasuryLiquidity",
+      "msg": "Treasury hat nicht genug SOL für die Sell-Auszahlung."
+    },
+    {
+      "code": 6019,
+      "name": "InsufficientBuyerDmdBalance",
+      "msg": "Buyer hat nicht genug DMD für diesen Sell."
+    },
+    {
+      "code": 6020,
+      "name": "SellAmountTooSmall",
+      "msg": "Sell-Menge ist zu klein."
+    },
+    {
+      "code": 6021,
+      "name": "SlippageExceeded",
+      "msg": "Min-Out / Slippage-Bedingung nicht erfüllt."
     }
   ],
   "types": [

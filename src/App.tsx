@@ -37,6 +37,7 @@ import { fetchSolUsd, computeDmdPricing } from "./price";
 import {
   buildIxCoder,
   ixAutoWhitelistSelf,
+  ixInitializeBuyerStateExtV2,
   ixBuyDmd,
   ixClaimRewardV2,
   ixSwapExactSolForDmd,
@@ -370,7 +371,9 @@ function decodeBuyerState(data: Buffer | Uint8Array): BuyerStateDecoded {
   };
 }
 
-function decodeBuyerStateExtV2(data: Buffer | Uint8Array): BuyerStateExtV2Decoded {
+function decodeBuyerStateExtV2(
+  data: Buffer | Uint8Array
+): BuyerStateExtV2Decoded {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let offset = 8;
 
@@ -554,7 +557,9 @@ function DashboardPage() {
   const [vaultOwnerMatch, setVaultOwnerMatch] = useState<boolean | null>(null);
   const [treasuryMatch, setTreasuryMatch] = useState<boolean | null>(null);
   const [sellLive, setSellLive] = useState<boolean | null>(null);
-  const [dynamicPricingEnabled, setDynamicPricingEnabled] = useState<boolean | null>(null);
+  const [dynamicPricingEnabled, setDynamicPricingEnabled] = useState<
+    boolean | null
+  >(null);
 
   useEffect(() => {
     let alive = true;
@@ -589,13 +594,20 @@ function DashboardPage() {
         const vAta = ataOf(vault, DMD_MINT);
         const ownerAta = ataOf(PROTOCOL_OWNER, DMD_MINT);
 
-        const [vaultInfo, configInfo, treLamports, vaultBal, ownerBal] = await Promise.all([
-          connection.getAccountInfo(vault).catch(() => null),
-          connection.getAccountInfo(vaultConfig).catch(() => null),
-          connection.getBalance(TREASURY).catch(() => 0),
-          connection.getTokenAccountBalance(vAta).then((r) => Number(r.value.uiAmount ?? 0)).catch(() => 0),
-          connection.getTokenAccountBalance(ownerAta).then((r) => Number(r.value.uiAmount ?? 0)).catch(() => 0),
-        ]);
+        const [vaultInfo, configInfo, treLamports, vaultBal, ownerBal] =
+          await Promise.all([
+            connection.getAccountInfo(vault).catch(() => null),
+            connection.getAccountInfo(vaultConfig).catch(() => null),
+            connection.getBalance(TREASURY).catch(() => 0),
+            connection
+              .getTokenAccountBalance(vAta)
+              .then((r) => Number(r.value.uiAmount ?? 0))
+              .catch(() => 0),
+            connection
+              .getTokenAccountBalance(ownerAta)
+              .then((r) => Number(r.value.uiAmount ?? 0))
+              .catch(() => 0),
+          ]);
 
         if (!alive) return;
 
@@ -689,17 +701,23 @@ function DashboardPage() {
       <div style={{ marginTop: 18 }} className="grid-3">
         <div className="card p-md">
           <div className="card-title">DMD Price (DEX)</div>
-          <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : "—"}</div>
+          <div className="card-value">
+            {dmdUsd ? dmdUsd.toFixed(6) : "—"}
+          </div>
         </div>
 
         <div className="card p-md">
           <div className="card-title">DMD App Value</div>
-          <div className="card-value">{dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}</div>
+          <div className="card-value">
+            {dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}
+          </div>
         </div>
 
         <div className="card p-md">
           <div className="card-title">SOL Price (USD)</div>
-          <div className="card-value">{solUsd ? solUsd.toFixed(2) : "—"}</div>
+          <div className="card-value">
+            {solUsd ? solUsd.toFixed(2) : "—"}
+          </div>
         </div>
       </div>
 
@@ -772,14 +790,16 @@ function DashboardPage() {
           <div className="panel" style={{ padding: 20 }}>
             <div className="panel-title">Protocol Notice</div>
             <p className="small muted" style={{ lineHeight: 1.6 }}>
-              Founder-/Owner-spezifische Feeds sind absichtlich nicht Teil des öffentlichen Investor-Flows.
+              Founder-/Owner-spezifische Feeds sind absichtlich nicht Teil des
+              öffentlichen Investor-Flows.
             </p>
           </div>
         ) : (
           <div className="panel" style={{ padding: 20 }}>
             <div className="panel-title">Status</div>
             <p className="small muted" style={{ lineHeight: 1.6 }}>
-              On-chain state is the source of truth. The app shows a conservative public surface.
+              On-chain state is the source of truth. The app shows a
+              conservative public surface.
             </p>
           </div>
         )}
@@ -818,11 +838,17 @@ function TradingPage() {
 
   const [walletDmd, setWalletDmd] = useState<number>(0);
   const [dmdMarketUsd, setDmdMarketUsd] = useState<number>(0);
-  const [walletInternalValueUsd, setWalletInternalValueUsd] = useState<number>(0);
-  const [nowTs, setNowTs] = useState<number>(() => Math.floor(Date.now() / 1000));
+  const [walletInternalValueUsd, setWalletInternalValueUsd] =
+    useState<number>(0);
+  const [nowTs, setNowTs] = useState<number>(() =>
+    Math.floor(Date.now() / 1000)
+  );
 
   useEffect(() => {
-    const iv = window.setInterval(() => setNowTs(Math.floor(Date.now() / 1000)), 1000);
+    const iv = window.setInterval(
+      () => setNowTs(Math.floor(Date.now() / 1000)),
+      1000
+    );
     return () => window.clearInterval(iv);
   }, []);
 
@@ -901,12 +927,13 @@ function TradingPage() {
           .catch(() => 0);
         if (alive) setWalletDmd(bBal);
 
-        const [buyerInfo, buyerExtInfo, vaultInfo, configInfo] = await Promise.all([
-          connection.getAccountInfo(bs).catch(() => null),
-          connection.getAccountInfo(bsExt).catch(() => null),
-          connection.getAccountInfo(vault).catch(() => null),
-          connection.getAccountInfo(vaultConfig).catch(() => null),
-        ]);
+        const [buyerInfo, buyerExtInfo, vaultInfo, configInfo] =
+          await Promise.all([
+            connection.getAccountInfo(bs).catch(() => null),
+            connection.getAccountInfo(bsExt).catch(() => null),
+            connection.getAccountInfo(vault).catch(() => null),
+            connection.getAccountInfo(vaultConfig).catch(() => null),
+          ]);
 
         if (!alive) return;
 
@@ -935,7 +962,9 @@ function TradingPage() {
           const configDecoded = decodeVaultConfigV2(configInfo.data);
           setSellLive(configDecoded.sellLive);
           if (Number(configDecoded.manualPriceLamportsPer10k) > 0) {
-            nextPriceLamports10k = Number(configDecoded.manualPriceLamportsPer10k);
+            nextPriceLamports10k = Number(
+              configDecoded.manualPriceLamportsPer10k
+            );
           }
         } else {
           setSellLive(false);
@@ -952,7 +981,8 @@ function TradingPage() {
         const treLam = await connection.getBalance(TREASURY).catch(() => 0);
 
         const pricing = await computeDmdPricing({
-          lamportsPer10k: nextPriceLamports10k > 0 ? nextPriceLamports10k : undefined,
+          lamportsPer10k:
+            nextPriceLamports10k > 0 ? nextPriceLamports10k : undefined,
           treasuryLamports: treLam > 0 ? treLam : undefined,
           manualFloorUsd: 0.01,
           treasuryWeight: 1.0,
@@ -1024,7 +1054,11 @@ function TradingPage() {
 
       const rawSol = Number(amountSol.replace(",", "."));
       if (!Number.isFinite(rawSol) || rawSol < BUY_MIN_SOL) {
-        setStatus(`Auto-Whitelist erfordert mindestens ${BUY_MIN_SOL.toFixed(1)} SOL Kaufabsicht.`);
+        setStatus(
+          `Auto-Whitelist erfordert mindestens ${BUY_MIN_SOL.toFixed(
+            1
+          )} SOL Kaufabsicht.`
+        );
         return;
       }
 
@@ -1042,6 +1076,30 @@ function TradingPage() {
     }
   }
 
+  async function handleInitBuyerExtV2() {
+    try {
+      if (!connected || !wallet.publicKey) {
+        alert("Wallet verbinden.");
+        return;
+      }
+
+      setStatus("Initialisiere BuyerStateExtV2…");
+
+      const ix = ixInitializeBuyerStateExtV2(ixCoder, wallet.publicKey);
+
+      const tx = new Transaction().add(ix);
+      tx.feePayer = wallet.publicKey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+      const sig = await wallet.sendTransaction(tx, connection);
+      setStatus(
+        `V2-Status initialisiert: ${sig}. Bitte Claim jetzt erneut drücken.`
+      );
+    } catch (e: unknown) {
+      setStatus("V2 Init Fehler: " + normalizeErrorMessage(e));
+    }
+  }
+
   async function handleBuy() {
     try {
       if (!connected || !wallet.publicKey) {
@@ -1050,7 +1108,11 @@ function TradingPage() {
       }
 
       const rawSol = Number(amountSol.replace(",", "."));
-      if (!Number.isFinite(rawSol) || rawSol < BUY_MIN_SOL || rawSol > BUY_MAX_SOL) {
+      if (
+        !Number.isFinite(rawSol) ||
+        rawSol < BUY_MIN_SOL ||
+        rawSol > BUY_MAX_SOL
+      ) {
         setStatus(`Buy-Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
         return;
       }
@@ -1061,7 +1123,9 @@ function TradingPage() {
       }
 
       if (policyView.buyCooldownLeft > 0) {
-        setStatus(`Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`);
+        setStatus(
+          `Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`
+        );
         return;
       }
 
@@ -1095,7 +1159,11 @@ function TradingPage() {
       }
 
       const rawSol = Number(amountSol.replace(",", "."));
-      if (!Number.isFinite(rawSol) || rawSol < BUY_MIN_SOL || rawSol > BUY_MAX_SOL) {
+      if (
+        !Number.isFinite(rawSol) ||
+        rawSol < BUY_MIN_SOL ||
+        rawSol > BUY_MAX_SOL
+      ) {
         setStatus(`SOL→DMD Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
         return;
       }
@@ -1106,7 +1174,9 @@ function TradingPage() {
       }
 
       if (policyView.buyCooldownLeft > 0) {
-        setStatus(`Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`);
+        setStatus(
+          `Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`
+        );
         return;
       }
 
@@ -1158,7 +1228,19 @@ function TradingPage() {
       }
 
       if (!buyerExt) {
-        setStatus("BuyerStateExtV2 fehlt. Bitte zuerst V2-Status initialisieren lassen.");
+        setStatus(
+          "Legacy-Wallet erkannt. Initialisiere zuerst BuyerStateExtV2…"
+        );
+
+        const initIx = ixInitializeBuyerStateExtV2(ixCoder, wallet.publicKey);
+        const initTx = new Transaction().add(initIx);
+        initTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        initTx.feePayer = wallet.publicKey;
+
+        const initSig = await wallet.sendTransaction(initTx, connection);
+        setStatus(
+          `V2-Status initialisiert: ${initSig}. Bitte Claim jetzt erneut drücken.`
+        );
         return;
       }
 
@@ -1188,13 +1270,25 @@ function TradingPage() {
     }
   }
 
+  async function handleSellClick() {
+    if (!sellLive) {
+      setStatus("Sell ist on-chain aktuell noch blockiert.");
+      return;
+    }
+
+    setStatus(
+      "Sell ist on-chain freigegeben, aber in dieser Investor App noch nicht verdrahtet."
+    );
+  }
+
   return (
     <div style={{ marginTop: 20 }}>
       {!connected && (
         <div className="panel" style={{ textAlign: "center", padding: 20 }}>
           <div className="panel-title">Wallet verbinden</div>
           <p className="small muted">
-            Verbinde deine Wallet über den Button unten, um DMD sicher zu nutzen.
+            Verbinde deine Wallet über den Button unten, um DMD sicher zu
+            nutzen.
           </p>
         </div>
       )}
@@ -1218,7 +1312,9 @@ function TradingPage() {
                     lineHeight: 1.2,
                   }}
                 >
-                  {walletInternalValueUsd > 0 ? fmtUsd(walletInternalValueUsd) : "—"}
+                  {walletInternalValueUsd > 0
+                    ? fmtUsd(walletInternalValueUsd)
+                    : "—"}
                 </span>
               </div>
             </div>
@@ -1230,7 +1326,9 @@ function TradingPage() {
 
             <div className="kv">
               <span>Wert deiner DMD (DEX)</span>
-              <b>{dmdMarketUsd > 0 ? fmtUsd(walletDmd * dmdMarketUsd) : "—"}</b>
+              <b>
+                {dmdMarketUsd > 0 ? fmtUsd(walletDmd * dmdMarketUsd) : "—"}
+              </b>
             </div>
 
             <div className="kv">
@@ -1265,18 +1363,23 @@ function TradingPage() {
             </div>
 
             <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
-              Die Anzeige basiert konservativ auf On-chain BuyerState, BuyerStateExtV2 und VaultConfigV2.
-              Maßgeblich bleibt die Blockchain.
+              Die Anzeige basiert konservativ auf On-chain BuyerState,
+              BuyerStateExtV2 und VaultConfigV2. Maßgeblich bleibt die
+              Blockchain.
             </div>
           </div>
 
           <div className="panel" style={{ marginBottom: 20 }}>
             <div className="panel-title">Trading Hinweis</div>
             <div className="small" style={{ lineHeight: 1.6 }}>
-              <b>Sell / DMD→SOL ist in der Investor App absichtlich deaktiviert.</b>
+              <b>
+                {sellLive
+                  ? "Sell / DMD→SOL ist on-chain freigegeben."
+                  : "Sell / DMD→SOL ist on-chain aktuell blockiert."}
+              </b>
               <br />
-              Die aktuelle On-chain-Policy behandelt Sell als blockierten Pfad.
-              Diese App bietet deshalb nur sichere Buy-/Claim-Wege an.
+              Die Investor App richtet sich nach dem echten On-chain-Status aus.
+              Buy und Claim bleiben der sichere Standardpfad.
             </div>
           </div>
 
@@ -1286,6 +1389,19 @@ function TradingPage() {
               <p className="small muted">Du bist noch nicht freigeschaltet.</p>
               <button className="btn" onClick={handleAutoWhitelist}>
                 Auto-Whitelist
+              </button>
+            </div>
+          )}
+
+          {whitelisted && !buyerExt && (
+            <div className="panel" style={{ marginBottom: 20 }}>
+              <div className="panel-title">V2 Aktivierung</div>
+              <p className="small muted" style={{ lineHeight: 1.6 }}>
+                Deine Wallet stammt noch aus dem Legacy-Stand. Für Claim V2
+                muss einmal BuyerStateExtV2 angelegt werden.
+              </p>
+              <button className="btn" onClick={handleInitBuyerExtV2}>
+                V2 STATUS INITIALISIEREN
               </button>
             </div>
           )}
@@ -1314,7 +1430,8 @@ function TradingPage() {
                 <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
                   Buy Bereich: {BUY_MIN_SOL} bis {BUY_MAX_SOL} SOL.
                   <br />
-                  Tageslimit: {BUY_DAILY_LIMIT} Buys. Danach kann ein Cooldown greifen.
+                  Tageslimit: {BUY_DAILY_LIMIT} Buys. Danach kann ein Cooldown
+                  greifen.
                 </div>
 
                 <div className="btn-grid" style={{ marginTop: 15 }}>
@@ -1335,7 +1452,6 @@ function TradingPage() {
                   className="input"
                   value={amountDmd}
                   onChange={(e) => setAmountDmd(e.target.value)}
-                  disabled
                 />
 
                 <label className="small muted" style={{ marginTop: 10 }}>
@@ -1345,23 +1461,31 @@ function TradingPage() {
                   className="input input--sm"
                   value={slippagePct}
                   onChange={(e) => setSlippagePct(e.target.value)}
-                  disabled
                 />
 
                 <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
-                  Sell bleibt bewusst deaktiviert, bis die On-chain-Policy ihn wieder freigibt.
+                  {sellLive
+                    ? "Sell ist on-chain freigegeben."
+                    : "Sell bleibt on-chain aktuell blockiert."}
                   <br />
                   Claim bleibt verfügbar, sobald die Bedingungen erfüllt sind.
                 </div>
 
                 <div className="btn-grid" style={{ marginTop: 15 }}>
-                  <button className="action-btn swap-btn" disabled title="Sell deaktiviert">
-                    SWAP DMD→SOL DISABLED
+                  <button
+                    className="action-btn swap-btn"
+                    disabled={!sellLive}
+                    title={
+                      sellLive ? "Sell verfügbar" : "Sell on-chain noch deaktiviert"
+                    }
+                    onClick={handleSellClick}
+                  >
+                    {sellLive ? "SWAP DMD→SOL" : "SWAP DMD→SOL BLOCKED"}
                   </button>
                   <button
                     className="action-btn"
                     onClick={handleClaim}
-                    disabled={!policyView.claimReady || !buyerExt || sellLive}
+                    disabled={!policyView.claimReady}
                     title={!policyView.claimReady ? "Noch nicht verfügbar" : "Claim verfügbar"}
                   >
                     CLAIM
@@ -1407,7 +1531,8 @@ function ForumPage() {
           <p className="small muted" style={{ lineHeight: 1.6 }}>
             Das Forum ist ohne Backend absichtlich im Schreibmodus deaktiviert.
             <br />
-            Grund: Kein lokaler LocalStorage-Fallback im produktiven Investor-Flow.
+            Grund: Kein lokaler LocalStorage-Fallback im produktiven
+            Investor-Flow.
           </p>
         </div>
       )}
@@ -1459,7 +1584,9 @@ function AirdropPage() {
 
       {connected && !isOwner && (
         <div className="panel" style={{ padding: 20 }}>
-          <p className="small muted">Nur der aktuelle Protocol Owner kann diesen Bereich sehen.</p>
+          <p className="small muted">
+            Nur der aktuelle Protocol Owner kann diesen Bereich sehen.
+          </p>
         </div>
       )}
 
