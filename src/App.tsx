@@ -236,6 +236,9 @@ function normalizeErrorMessage(err: unknown): string {
   if (raw.includes("InsufficientVaultRewardLiquidity")) {
     return "Nicht genug Reward-Liquidität im Vault.";
   }
+  if (raw.includes("InsufficientTreasuryLiquidity")) {
+    return "Die Treasury hat aktuell nicht genug Liquidität für diesen Pfad.";
+  }
 
   return raw;
 }
@@ -404,6 +407,7 @@ function decodeBuyerStateExtV2(
 // Types
 // -------------------------
 type Tab = "Dashboard" | "Trading" | "Forum" | "Leaderboard" | "Airdrop";
+type UiKind = "idle" | "info" | "success" | "error";
 
 type ChartPoint = {
   time: string;
@@ -411,6 +415,117 @@ type ChartPoint = {
   dmdAppUsd: number;
   solUsd: number;
 };
+
+// =============================================================
+// Shared UI helpers
+// =============================================================
+function StatusDot({
+  active,
+  label,
+}: {
+  active: boolean | null;
+  label?: string;
+}) {
+  const bg =
+    active == null
+      ? "rgba(255,255,255,0.35)"
+      : active
+      ? "#14f195"
+      : "#ff4d4f";
+
+  const glow =
+    active == null
+      ? "0 0 0 1px rgba(255,255,255,0.16)"
+      : active
+      ? "0 0 10px rgba(20,241,149,0.9), 0 0 18px rgba(20,241,149,0.45)"
+      : "0 0 10px rgba(255,77,79,0.75), 0 0 18px rgba(255,77,79,0.32)";
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: 12,
+          height: 12,
+          borderRadius: "50%",
+          background: bg,
+          boxShadow: glow,
+          display: "inline-block",
+          flex: "0 0 auto",
+        }}
+      />
+      {label ? <span>{label}</span> : null}
+    </span>
+  );
+}
+
+function StatusPanel({
+  kind,
+  message,
+}: {
+  kind: UiKind;
+  message: string;
+}) {
+  if (!message) return null;
+
+  const border =
+    kind === "error"
+      ? "rgba(255,77,79,0.5)"
+      : kind === "success"
+      ? "rgba(20,241,149,0.45)"
+      : "rgba(245,197,66,0.35)";
+
+  const bg =
+    kind === "error"
+      ? "rgba(255,77,79,0.10)"
+      : kind === "success"
+      ? "rgba(20,241,149,0.10)"
+      : "rgba(245,197,66,0.08)";
+
+  const color =
+    kind === "error"
+      ? "#ff9ea0"
+      : kind === "success"
+      ? "#8dffd3"
+      : "#f5c542";
+
+  return (
+    <div
+      className="panel"
+      style={{
+        marginTop: 20,
+        padding: 16,
+        border: `1px solid ${border}`,
+        background: bg,
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 700,
+          fontSize: 13,
+          color,
+          marginBottom: 6,
+          letterSpacing: 0.3,
+        }}
+      >
+        {kind === "error"
+          ? "ERROR"
+          : kind === "success"
+          ? "STATUS OK"
+          : "HINWEIS"}
+      </div>
+      <div className="small" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
+        {message}
+      </div>
+    </div>
+  );
+}
 
 // =============================================================
 // Router (Tabs)
@@ -701,23 +816,17 @@ function DashboardPage() {
       <div style={{ marginTop: 18 }} className="grid-3">
         <div className="card p-md">
           <div className="card-title">DMD Price (DEX)</div>
-          <div className="card-value">
-            {dmdUsd ? dmdUsd.toFixed(6) : "—"}
-          </div>
+          <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : "—"}</div>
         </div>
 
         <div className="card p-md">
           <div className="card-title">DMD App Value</div>
-          <div className="card-value">
-            {dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}
-          </div>
+          <div className="card-value">{dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}</div>
         </div>
 
         <div className="card p-md">
           <div className="card-title">SOL Price (USD)</div>
-          <div className="card-value">
-            {solUsd ? solUsd.toFixed(2) : "—"}
-          </div>
+          <div className="card-value">{solUsd ? solUsd.toFixed(2) : "—"}</div>
         </div>
       </div>
 
@@ -739,7 +848,12 @@ function DashboardPage() {
         <div className="card p-md">
           <div className="card-title">Sell Status</div>
           <div className="card-value">
-            {sellLive == null ? "—" : sellLive ? "LIVE" : "BLOCKED"}
+            <StatusDot
+              active={sellLive}
+              label={
+                sellLive == null ? "UNKNOWN" : sellLive ? "LIVE" : "BLOCKED"
+              }
+            />
           </div>
         </div>
       </div>
@@ -822,7 +936,9 @@ function TradingPage() {
 
   const ixCoder = useMemo(() => buildIxCoder(idl), []);
 
-  const [status, setStatus] = useState<string>("");
+  const [uiMessage, setUiMessage] = useState<string>("");
+  const [uiKind, setUiKind] = useState<UiKind>("idle");
+
   const [amountSol, setAmountSol] = useState<string>("1.0");
   const [amountDmd, setAmountDmd] = useState<string>("10000");
   const [slippagePct, setSlippagePct] = useState<string>("1.0");
@@ -843,6 +959,21 @@ function TradingPage() {
   const [nowTs, setNowTs] = useState<number>(() =>
     Math.floor(Date.now() / 1000)
   );
+
+  function setInfo(message: string) {
+    setUiKind("info");
+    setUiMessage(message);
+  }
+
+  function setSuccess(message: string) {
+    setUiKind("success");
+    setUiMessage(message);
+  }
+
+  function setError(message: string) {
+    setUiKind("error");
+    setUiMessage(message);
+  }
 
   useEffect(() => {
     const iv = window.setInterval(
@@ -1054,7 +1185,7 @@ function TradingPage() {
 
       const rawSol = Number(amountSol.replace(",", "."));
       if (!Number.isFinite(rawSol) || rawSol < BUY_MIN_SOL) {
-        setStatus(
+        setError(
           `Auto-Whitelist erfordert mindestens ${BUY_MIN_SOL.toFixed(
             1
           )} SOL Kaufabsicht.`
@@ -1062,7 +1193,7 @@ function TradingPage() {
         return;
       }
 
-      setStatus("Auto-Whitelist…");
+      setInfo("Auto-Whitelist…");
 
       const ix = ixAutoWhitelistSelf(ixCoder, wallet.publicKey);
       const tx = new Transaction().add(ix);
@@ -1070,9 +1201,9 @@ function TradingPage() {
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setStatus(`Whitelist gesendet: ${sig}`);
+      setSuccess(`Whitelist gesendet: ${sig}`);
     } catch (e: unknown) {
-      setStatus("Whitelist Fehler: " + normalizeErrorMessage(e));
+      setError("Whitelist Fehler: " + normalizeErrorMessage(e));
     }
   }
 
@@ -1083,7 +1214,7 @@ function TradingPage() {
         return;
       }
 
-      setStatus("Initialisiere BuyerStateExtV2…");
+      setInfo("Initialisiere BuyerStateExtV2…");
 
       const ix = ixInitializeBuyerStateExtV2(ixCoder, wallet.publicKey);
 
@@ -1092,11 +1223,11 @@ function TradingPage() {
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setStatus(
+      setSuccess(
         `V2-Status initialisiert: ${sig}. Bitte Claim jetzt erneut drücken.`
       );
     } catch (e: unknown) {
-      setStatus("V2 Init Fehler: " + normalizeErrorMessage(e));
+      setError("V2 Init Fehler: " + normalizeErrorMessage(e));
     }
   }
 
@@ -1113,23 +1244,23 @@ function TradingPage() {
         rawSol < BUY_MIN_SOL ||
         rawSol > BUY_MAX_SOL
       ) {
-        setStatus(`Buy-Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
+        setError(`Buy-Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
         return;
       }
 
       if (!whitelisted) {
-        setStatus("Wallet ist nicht freigeschaltet.");
+        setError("Wallet ist nicht freigeschaltet.");
         return;
       }
 
       if (policyView.buyCooldownLeft > 0) {
-        setStatus(
+        setError(
           `Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`
         );
         return;
       }
 
-      setStatus("Buy…");
+      setInfo("Buy…");
 
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
@@ -1145,9 +1276,9 @@ function TradingPage() {
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setStatus(`Buy gesendet: ${sig}`);
+      setSuccess(`Buy gesendet: ${sig}`);
     } catch (e: unknown) {
-      setStatus("Buy Fehler: " + normalizeErrorMessage(e));
+      setError("Buy Fehler: " + normalizeErrorMessage(e));
     }
   }
 
@@ -1164,28 +1295,28 @@ function TradingPage() {
         rawSol < BUY_MIN_SOL ||
         rawSol > BUY_MAX_SOL
       ) {
-        setStatus(`SOL→DMD Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
+        setError(`SOL→DMD Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
         return;
       }
 
       if (!whitelisted) {
-        setStatus("Wallet ist nicht freigeschaltet.");
+        setError("Wallet ist nicht freigeschaltet.");
         return;
       }
 
       if (policyView.buyCooldownLeft > 0) {
-        setStatus(
+        setError(
           `Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`
         );
         return;
       }
 
       if (!priceLamports10k || priceLamports10k <= 0) {
-        setStatus("Preisstatus noch nicht geladen. Bitte kurz erneut versuchen.");
+        setError("Preisstatus noch nicht geladen. Bitte kurz erneut versuchen.");
         return;
       }
 
-      setStatus("Swap SOL→DMD…");
+      setInfo("Swap SOL→DMD…");
 
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
@@ -1209,9 +1340,9 @@ function TradingPage() {
       tx.feePayer = buyer;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setStatus(`Swap SOL→DMD: ${sig}`);
+      setSuccess(`Swap SOL→DMD: ${sig}`);
     } catch (e: unknown) {
-      setStatus("Swap Fehler: " + normalizeErrorMessage(e));
+      setError("Swap Fehler: " + normalizeErrorMessage(e));
     }
   }
 
@@ -1223,14 +1354,12 @@ function TradingPage() {
       }
 
       if (!buyerState) {
-        setStatus("Kein BuyerState vorhanden.");
+        setError("Kein BuyerState vorhanden.");
         return;
       }
 
       if (!buyerExt) {
-        setStatus(
-          "Legacy-Wallet erkannt. Initialisiere zuerst BuyerStateExtV2…"
-        );
+        setInfo("Legacy-Wallet erkannt. Initialisiere zuerst BuyerStateExtV2…");
 
         const initIx = ixInitializeBuyerStateExtV2(ixCoder, wallet.publicKey);
         const initTx = new Transaction().add(initIx);
@@ -1238,18 +1367,18 @@ function TradingPage() {
         initTx.feePayer = wallet.publicKey;
 
         const initSig = await wallet.sendTransaction(initTx, connection);
-        setStatus(
+        setSuccess(
           `V2-Status initialisiert: ${initSig}. Bitte Claim jetzt erneut drücken.`
         );
         return;
       }
 
       if (!policyView.claimReady) {
-        setStatus(policyView.claimText || "Claim noch nicht verfügbar.");
+        setError(policyView.claimText || "Claim noch nicht verfügbar.");
         return;
       }
 
-      setStatus("Claim…");
+      setInfo("Claim…");
 
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
@@ -1264,20 +1393,20 @@ function TradingPage() {
       tx.feePayer = buyer;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setStatus(`Claim gesendet: ${sig}`);
+      setSuccess(`Claim gesendet: ${sig}`);
     } catch (e: unknown) {
-      setStatus("Claim Fehler: " + normalizeErrorMessage(e));
+      setError("Claim Fehler: " + normalizeErrorMessage(e));
     }
   }
 
   async function handleSellClick() {
     if (!sellLive) {
-      setStatus("Sell ist on-chain aktuell noch blockiert.");
+      setError("Sell ist on-chain aktuell noch blockiert.");
       return;
     }
 
-    setStatus(
-      "Sell ist on-chain freigegeben, aber in dieser Investor App noch nicht verdrahtet."
+    setInfo(
+      "Sell ist on-chain freigegeben. Der Public-Investor-Client führt den Sell-Pfad aktuell noch nicht selbst aus, weil die on-chain Sell-Wege treasury-seitig signaturgebunden sind."
     );
   }
 
@@ -1360,6 +1489,16 @@ function TradingPage() {
             <div className="kv">
               <span>Vault (DMD)</span>
               <b>{vaultDmd != null ? vaultDmd.toLocaleString() : "—"}</b>
+            </div>
+
+            <div className="kv">
+              <span>Sell Route</span>
+              <b>
+                <StatusDot
+                  active={sellLive}
+                  label={sellLive ? "ON-CHAIN LIVE" : "ON-CHAIN BLOCKED"}
+                />
+              </b>
             </div>
 
             <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
@@ -1464,11 +1603,18 @@ function TradingPage() {
                 />
 
                 <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
-                  {sellLive
-                    ? "Sell ist on-chain freigegeben."
-                    : "Sell bleibt on-chain aktuell blockiert."}
+                  <StatusDot
+                    active={sellLive}
+                    label={
+                      sellLive
+                        ? "Sell ist on-chain freigegeben."
+                        : "Sell bleibt on-chain aktuell blockiert."
+                    }
+                  />
                   <br />
-                  Claim bleibt verfügbar, sobald die Bedingungen erfüllt sind.
+                  <span style={{ display: "inline-block", marginTop: 8 }}>
+                    Claim bleibt verfügbar, sobald die Bedingungen erfüllt sind.
+                  </span>
                 </div>
 
                 <div className="btn-grid" style={{ marginTop: 15 }}>
@@ -1494,13 +1640,9 @@ function TradingPage() {
               </div>
             </div>
           )}
-        </>
-      )}
 
-      {status && (
-        <p className="small muted" style={{ marginTop: 20, whiteSpace: "pre-wrap" }}>
-          {status}
-        </p>
+          <StatusPanel kind={uiKind} message={uiMessage} />
+        </>
       )}
     </div>
   );
