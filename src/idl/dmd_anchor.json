@@ -442,6 +442,109 @@
       "args": []
     },
     {
+      "name": "grant_extra_sell_approvals",
+      "discriminator": [
+        230,
+        95,
+        54,
+        204,
+        50,
+        80,
+        222,
+        116
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer"
+        },
+        {
+          "name": "buyer_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state_ext_v2",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114,
+                  45,
+                  101,
+                  120,
+                  116,
+                  45,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "approvals",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "discriminator": [
         175,
@@ -877,6 +980,39 @@
           }
         },
         {
+          "name": "buyer_state_ext_v2",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114,
+                  45,
+                  101,
+                  120,
+                  116,
+                  45,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
           "name": "vault_token_account",
           "writable": true
         },
@@ -940,6 +1076,38 @@
                   108,
                   116
                 ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_config_v2",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  45,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
               }
             ]
           }
@@ -1031,6 +1199,39 @@
                   121,
                   101,
                   114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state_ext_v2",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114,
+                  45,
+                  101,
+                  120,
+                  116,
+                  45,
+                  118,
+                  50
                 ]
               },
               {
@@ -1161,6 +1362,39 @@
                   121,
                   101,
                   114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_state_ext_v2",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  101,
+                  114,
+                  45,
+                  101,
+                  120,
+                  116,
+                  45,
+                  118,
+                  50
                 ]
               },
               {
@@ -1588,7 +1822,7 @@
     {
       "code": 6013,
       "name": "BuyDailyLimitExceeded",
-      "msg": "Tageslimit für Buys überschritten. 2-Tage-Cooldown aktiviert."
+      "msg": "Tageslimit für Buys überschritten."
     },
     {
       "code": 6014,
@@ -1629,6 +1863,21 @@
       "code": 6021,
       "name": "SlippageExceeded",
       "msg": "Min-Out / Slippage-Bedingung nicht erfüllt."
+    },
+    {
+      "code": 6022,
+      "name": "ExtraSellApprovalRequired",
+      "msg": "Zusätzliche Sell-Freigabe erforderlich."
+    },
+    {
+      "code": 6023,
+      "name": "InvalidApprovalAmount",
+      "msg": "Ungültige Freigabemenge."
+    },
+    {
+      "code": 6024,
+      "name": "ApprovalLimitExceeded",
+      "msg": "Zu viele zusätzliche Sell-Freigaben."
     }
   ],
   "types": [
