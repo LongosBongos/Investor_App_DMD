@@ -41,6 +41,7 @@ import {
   ixBuyDmd,
   ixClaimRewardV2,
   ixSwapExactSolForDmd,
+  ixSwapExactDmdForSol,
   findVaultPda,
   findVaultConfigV2Pda,
   findBuyerStatePda,
@@ -84,6 +85,8 @@ const CLAIM_INTERVAL_SEC = 60 * 60 * 24 * 90;
 const BUY_MIN_SOL = 0.1;
 const BUY_MAX_SOL = 100;
 const BUY_DAILY_LIMIT = 10;
+const SELL_WINDOW_SEC = 60 * 60 * 24 * 30;
+const FREE_SELLS_PER_WINDOW = 2;
 const DEX_PAIR = "6xBMvGzomHgPdWtD3V4JQ8rqji5EWtFDDoAyQhYsVVd2";
 
 // -------------------------
@@ -238,6 +241,9 @@ function normalizeErrorMessage(err: unknown): string {
   }
   if (raw.includes("InsufficientTreasuryLiquidity")) {
     return "Die Treasury hat aktuell nicht genug Liquidität für diesen Pfad.";
+  }
+  if (raw.includes("ExtraSellApprovalRequired")) {
+    return "Zusätzliche Sell-Freigabe erforderlich.";
   }
 
   return raw;
@@ -946,6 +952,7 @@ function TradingPage() {
   const [buyerState, setBuyerState] = useState<BuyerStateDecoded | null>(null);
   const [buyerExt, setBuyerExt] = useState<BuyerStateExtV2Decoded | null>(null);
   const [whitelisted, setWhitelisted] = useState<boolean>(false);
+  const [isLegacyWallet, setIsLegacyWallet] = useState<boolean>(false);
 
   const [treasurySol, setTreasurySol] = useState<number>(0);
   const [priceLamports10k, setPriceLamports10k] = useState<number | null>(null);
@@ -993,6 +1000,11 @@ function TradingPage() {
       claimReady: false,
       claimText: "—",
       dailyCountText: "—",
+      sellCountWindow: 0,
+      freeSellsLeft: FREE_SELLS_PER_WINDOW,
+      extraSellApprovals: 0,
+      sellWindowTimeLeft: 0,
+      sellWindowText: "—",
     };
 
     if (!buyerState) return result;
@@ -1010,6 +1022,23 @@ function TradingPage() {
     if (buyerExt) {
       const cooldownUntil = Number(buyerExt.buyCooldownUntil);
       result.buyCooldownLeft = Math.max(0, cooldownUntil - nowTs);
+
+      result.sellCountWindow = buyerExt.sellCountWindow;
+      result.extraSellApprovals = buyerExt.extraSellApprovals;
+      result.freeSellsLeft = Math.max(
+        0,
+        FREE_SELLS_PER_WINDOW - buyerExt.sellCountWindow
+      );
+
+      const sellWindowStart = Number(buyerExt.sellWindowStart);
+      if (sellWindowStart > 0) {
+        const readyAt = sellWindowStart + SELL_WINDOW_SEC;
+        result.sellWindowTimeLeft = Math.max(0, readyAt - nowTs);
+        result.sellWindowText =
+          result.sellWindowTimeLeft > 0
+            ? fmtCountdown(result.sellWindowTimeLeft)
+            : "Reset fällig / nächstes Fenster aktiv";
+      }
     }
 
     result.holdReadyAt = holdSince > 0 ? holdSince + HOLD_DURATION_SEC : 0;
@@ -1038,6 +1067,7 @@ function TradingPage() {
         setWhitelisted(false);
         setWalletDmd(0);
         setWalletInternalValueUsd(0);
+        setIsLegacyWallet(false);
         return;
       }
 
@@ -1079,8 +1109,10 @@ function TradingPage() {
 
         if (buyerExtInfo?.data) {
           setBuyerExt(decodeBuyerStateExtV2(buyerExtInfo.data));
+          setIsLegacyWallet(false);
         } else {
           setBuyerExt(null);
+          setIsLegacyWallet(Boolean(buyerInfo?.data));
         }
 
         let nextPriceLamports10k = 0;
@@ -1224,7 +1256,7 @@ function TradingPage() {
 
       const sig = await wallet.sendTransaction(tx, connection);
       setSuccess(
-        `V2-Status initialisiert: ${sig}. Bitte Claim jetzt erneut drücken.`
+        `V2-Status initialisiert: ${sig}. Bitte danach Claim / Trading erneut nutzen.`
       );
     } catch (e: unknown) {
       setError("V2 Init Fehler: " + normalizeErrorMessage(e));
@@ -1235,6 +1267,13 @@ function TradingPage() {
     try {
       if (!connected || !wallet.publicKey) {
         alert("Wallet verbinden.");
+        return;
+      }
+
+      if (isLegacyWallet) {
+        setError(
+          "Legacy-Wallet erkannt. Bitte zuerst BuyerStateExtV2 initialisieren."
+        );
         return;
       }
 
@@ -1286,6 +1325,13 @@ function TradingPage() {
     try {
       if (!connected || !wallet.publicKey) {
         alert("Wallet verbinden.");
+        return;
+      }
+
+      if (isLegacyWallet) {
+        setError(
+          "Legacy-Wallet erkannt. Bitte zuerst BuyerStateExtV2 initialisieren."
+        );
         return;
       }
 
@@ -1358,7 +1404,7 @@ function TradingPage() {
         return;
       }
 
-      if (!buyerExt) {
+      if (!buyerExt || isLegacyWallet) {
         setInfo("Legacy-Wallet erkannt. Initialisiere zuerst BuyerStateExtV2…");
 
         const initIx = ixInitializeBuyerStateExtV2(ixCoder, wallet.publicKey);
@@ -1400,14 +1446,42 @@ function TradingPage() {
   }
 
   async function handleSellClick() {
-    if (!sellLive) {
-      setError("Sell ist on-chain aktuell noch blockiert.");
-      return;
-    }
+    try {
+      if (!connected || !wallet.publicKey) {
+        alert("Wallet verbinden.");
+        return;
+      }
 
-    setInfo(
-      "Sell ist on-chain freigegeben. Der Public-Investor-Client führt den Sell-Pfad aktuell noch nicht selbst aus, weil die on-chain Sell-Wege treasury-seitig signaturgebunden sind."
-    );
+      if (isLegacyWallet) {
+        setError(
+          "Legacy-Wallet erkannt. Bitte zuerst BuyerStateExtV2 initialisieren."
+        );
+        return;
+      }
+
+      if (!sellLive) {
+        setError("Sell ist on-chain aktuell noch blockiert.");
+        return;
+      }
+
+      const rawDmd = Number(amountDmd.replace(",", "."));
+      if (!Number.isFinite(rawDmd) || rawDmd <= 0) {
+        setError("Bitte eine gültige DMD-Menge eingeben.");
+        return;
+      }
+
+      // On-chain route exists, but investor client cannot execute it safely
+      // because treasury is a required signer on the current protocol design.
+      // We keep the runtime aligned to truth, but do not fake a public sell path.
+      // Import remains present so the UI stays aligned with solana.ts / IDL surface.
+      void ixSwapExactDmdForSol;
+
+      setInfo(
+        "Sell ist on-chain freigegeben. Der Public-Investor-Client führt den DMD→SOL-Pfad aktuell bewusst nicht selbst aus, weil die bestehende On-chain-Sell-Route treasury-seitig signergebunden ist. Die App zeigt dir den echten Sell-Status, aber täuscht keinen öffentlichen Sell-Flow vor."
+      );
+    } catch (e: unknown) {
+      setError("Sell Hinweis: " + normalizeErrorMessage(e));
+    }
   }
 
   return (
@@ -1482,6 +1556,26 @@ function TradingPage() {
             </div>
 
             <div className="kv">
+              <span>Sell Count Window</span>
+              <b>{buyerExt ? buyerExt.sellCountWindow : "—"}</b>
+            </div>
+
+            <div className="kv">
+              <span>Freie Sells im Fenster</span>
+              <b>{buyerExt ? policyView.freeSellsLeft : "—"}</b>
+            </div>
+
+            <div className="kv">
+              <span>Extra Sell Approvals</span>
+              <b>{buyerExt ? buyerExt.extraSellApprovals : "—"}</b>
+            </div>
+
+            <div className="kv">
+              <span>Sell Window Reset</span>
+              <b>{buyerExt ? policyView.sellWindowText : "—"}</b>
+            </div>
+
+            <div className="kv">
               <span>Treasury (SOL)</span>
               <b>{treasurySol.toFixed(2)}</b>
             </div>
@@ -1500,6 +1594,20 @@ function TradingPage() {
                 />
               </b>
             </div>
+
+            {isLegacyWallet && (
+              <div
+                className="small"
+                style={{
+                  marginTop: 12,
+                  color: "#f5c542",
+                  lineHeight: 1.6,
+                  fontWeight: 600,
+                }}
+              >
+                Legacy-Wallet erkannt: BuyerState vorhanden, BuyerStateExtV2 fehlt noch.
+              </div>
+            )}
 
             <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
               Die Anzeige basiert konservativ auf On-chain BuyerState,
@@ -1532,12 +1640,13 @@ function TradingPage() {
             </div>
           )}
 
-          {whitelisted && !buyerExt && (
+          {whitelisted && isLegacyWallet && (
             <div className="panel" style={{ marginBottom: 20 }}>
               <div className="panel-title">V2 Aktivierung</div>
               <p className="small muted" style={{ lineHeight: 1.6 }}>
-                Deine Wallet stammt noch aus dem Legacy-Stand. Für Claim V2
-                muss einmal BuyerStateExtV2 angelegt werden.
+                Deine Wallet stammt noch aus dem Legacy-Stand. Für den finalen
+                V2-Pfad muss einmal BuyerStateExtV2 angelegt werden. Danach
+                läuft die App nur noch über die echte gehärtete On-chain-Logik.
               </p>
               <button className="btn" onClick={handleInitBuyerExtV2}>
                 V2 STATUS INITIALISIEREN
@@ -1545,7 +1654,7 @@ function TradingPage() {
             </div>
           )}
 
-          {whitelisted && (
+          {whitelisted && !isLegacyWallet && (
             <div className="grid-2">
               <div className="panel">
                 <div className="panel-title">SOL → DMD</div>
@@ -1611,6 +1720,14 @@ function TradingPage() {
                         : "Sell bleibt on-chain aktuell blockiert."
                     }
                   />
+                  <br />
+                  <span style={{ display: "inline-block", marginTop: 8 }}>
+                    Freie Sells im Fenster: {policyView.freeSellsLeft}
+                  </span>
+                  <br />
+                  <span style={{ display: "inline-block", marginTop: 4 }}>
+                    Extra-Freigaben: {policyView.extraSellApprovals}
+                  </span>
                   <br />
                   <span style={{ display: "inline-block", marginTop: 8 }}>
                     Claim bleibt verfügbar, sobald die Bedingungen erfüllt sind.

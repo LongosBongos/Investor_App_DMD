@@ -309,7 +309,10 @@ export function normalizeBuyerState(decoded: unknown): BuyerStateDecoded {
       "lastRewardClaim"
     ),
     lastSell: requireBn(obj.lastSell ?? obj.last_sell, "lastSell"),
-    holdingSince: requireBn(obj.holdingSince ?? obj.holding_since, "holdingSince"),
+    holdingSince: requireBn(
+      obj.holdingSince ?? obj.holding_since,
+      "holdingSince"
+    ),
     lastBuyDay: requireBn(obj.lastBuyDay ?? obj.last_buy_day, "lastBuyDay"),
     buyCountToday: requireBn(
       obj.buyCountToday ?? obj.buy_count_today,
@@ -349,7 +352,6 @@ export function normalizeBuyerStateExtV2(
 
 // --------------------------------------------------
 // Protocol / admin side instructions
-// Kept here for completeness.
 // --------------------------------------------------
 export function ixInitialize(
   ixCoder: anchor.BorshInstructionCoder,
@@ -427,12 +429,14 @@ export function ixSetManualPrice(
   protocolOwnerPubkey: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
   const vault = findVaultPda();
+  const vaultConfigV2 = findVaultConfigV2Pda(vault);
 
   return ix_fromCoder(
     ixCoder,
     "set_manual_price",
     [
       { pubkey: vault, isSigner: false, isWritable: true },
+      { pubkey: vaultConfigV2, isSigner: false, isWritable: true },
       { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: false },
     ],
     { lamports_per_10k: bn(lamportsPer10k) }
@@ -536,6 +540,32 @@ export function ixInitializeBuyerStateExtV2(
   );
 }
 
+export function ixGrantExtraSellApprovals(
+  ixCoder: anchor.BorshInstructionCoder,
+  buyerPubkey: PublicKey,
+  approvals: number,
+  protocolOwnerPubkey: PublicKey = PROTOCOL_OWNER
+): TransactionInstruction {
+  const vault = findVaultPda();
+  const buyerState = findBuyerStatePda(vault, buyerPubkey);
+  const buyerStateExtV2 = findBuyerStateExtV2Pda(vault, buyerPubkey);
+
+  return ix_fromCoder(
+    ixCoder,
+    "grant_extra_sell_approvals",
+    [
+      { pubkey: vault, isSigner: false, isWritable: false },
+      { pubkey: buyerPubkey, isSigner: false, isWritable: false },
+      { pubkey: buyerState, isSigner: false, isWritable: false },
+      { pubkey: buyerStateExtV2, isSigner: false, isWritable: true },
+      { pubkey: protocolOwnerPubkey, isSigner: true, isWritable: false },
+    ],
+    {
+      approvals,
+    }
+  );
+}
+
 // --------------------------------------------------
 // Investor-facing instructions (V2 aligned)
 // --------------------------------------------------
@@ -636,6 +666,7 @@ export function ixSwapExactSolForDmd(
   const vault = findVaultPda();
   const vaultConfigV2 = findVaultConfigV2Pda(vault);
   const buyerState = findBuyerStatePda(vault, userPubkey);
+  const buyerStateExtV2 = findBuyerStateExtV2Pda(vault, userPubkey);
   const vaultTokenAccount = vaultAta(vault);
   const userDmdAta = buyerAta(userPubkey);
 
@@ -646,6 +677,7 @@ export function ixSwapExactSolForDmd(
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: vaultConfigV2, isSigner: false, isWritable: false },
       { pubkey: buyerState, isSigner: false, isWritable: true },
+      { pubkey: buyerStateExtV2, isSigner: false, isWritable: true },
       { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
       { pubkey: userDmdAta, isSigner: false, isWritable: true },
       { pubkey: protocolOwnerSystem, isSigner: false, isWritable: true },
@@ -666,12 +698,13 @@ export function ixSwapExactDmdForSol(
   userPubkey: PublicKey,
   amountInDmd: number | bigint,
   minOutSol: number | bigint,
-  treasury: PublicKey = TREASURY,
+  treasurySigner: PublicKey = TREASURY,
   protocolOwnerSystem: PublicKey = PROTOCOL_OWNER
 ): TransactionInstruction {
   const vault = findVaultPda();
   const vaultConfigV2 = findVaultConfigV2Pda(vault);
   const buyerState = findBuyerStatePda(vault, userPubkey);
+  const buyerStateExtV2 = findBuyerStateExtV2Pda(vault, userPubkey);
   const vaultTokenAccount = vaultAta(vault);
   const userDmdAta = buyerAta(userPubkey);
 
@@ -682,9 +715,10 @@ export function ixSwapExactDmdForSol(
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: vaultConfigV2, isSigner: false, isWritable: false },
       { pubkey: buyerState, isSigner: false, isWritable: true },
+      { pubkey: buyerStateExtV2, isSigner: false, isWritable: true },
       { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
       { pubkey: userDmdAta, isSigner: false, isWritable: true },
-      { pubkey: treasury, isSigner: false, isWritable: true },
+      { pubkey: treasurySigner, isSigner: true, isWritable: true },
       { pubkey: protocolOwnerSystem, isSigner: false, isWritable: true },
       { pubkey: userPubkey, isSigner: true, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -707,6 +741,7 @@ export function ixSellDmdV2(
   const vault = findVaultPda();
   const vaultConfigV2 = findVaultConfigV2Pda(vault);
   const buyerState = findBuyerStatePda(vault, buyerPubkey);
+  const buyerStateExtV2 = findBuyerStateExtV2Pda(vault, buyerPubkey);
   const vaultTokenAccount = vaultAta(vault);
   const buyerTokenAccount = buyerAta(buyerPubkey);
 
@@ -717,6 +752,7 @@ export function ixSellDmdV2(
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: vaultConfigV2, isSigner: false, isWritable: false },
       { pubkey: buyerState, isSigner: false, isWritable: true },
+      { pubkey: buyerStateExtV2, isSigner: false, isWritable: true },
       { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
       { pubkey: buyerTokenAccount, isSigner: false, isWritable: true },
       { pubkey: treasurySigner, isSigner: true, isWritable: true },
