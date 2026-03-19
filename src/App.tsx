@@ -21,7 +21,6 @@ import {
 } from "@solana/wallet-adapter-wallets";
 import type { WalletAdapter } from "@solana/wallet-adapter-base";
 import "@solana/wallet-adapter-react-ui/styles.css";
-
 import {
   Connection,
   Commitment,
@@ -30,10 +29,8 @@ import {
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
-
 import idl from "./idl/dmd_anchor.json";
 import { fetchSolUsd, computeDmdPricing } from "./price";
-
 import {
   buildIxCoder,
   ixAutoWhitelistSelf,
@@ -53,7 +50,6 @@ import {
   TREASURY,
   DMD_MINT,
 } from "./solana";
-
 // UI Modules
 import Leaderboard from "./Leaderboard";
 import ForumView from "./ForumView";
@@ -62,7 +58,6 @@ import TokenDistribution from "./TokenDistribution";
 import WelcomeOverlay from "./WelcomeOverlay";
 import PriceChart from "./PriceChart";
 import TxFeed from "./TxFeed";
-
 import "./index.css";
 
 // -------------------------
@@ -94,16 +89,13 @@ const DEX_PAIR = "6xBMvGzomHgPdWtD3V4JQ8rqji5EWtFDDoAyQhYsVVd2";
 // -------------------------
 function getRpcUrl(): string {
   const DEFAULT_RPC = "https://api.mainnet-beta.solana.com";
-
   const envRpc = import.meta.env.VITE_RPC_URL?.trim();
   const rpc = envRpc && envRpc.length > 0 ? envRpc : DEFAULT_RPC;
-
   if (rpc.includes("api-key=") || rpc.includes("apiKey=")) {
     throw new Error(
       "SECURITY: VITE_RPC_URL contains api-key. Remove it and use a keyless endpoint or a backend proxy."
     );
   }
-
   return rpc;
 }
 
@@ -113,23 +105,18 @@ function getRpcUrl(): string {
 function backendEnabled(): boolean {
   return (import.meta.env.VITE_BACKEND_ENABLED || "").trim() === "1";
 }
-
 function backendBase(): string {
   return (import.meta.env.VITE_BACKEND_URL || "").trim();
 }
-
 async function fetchBackendJson(path: string): Promise<unknown> {
   const base = backendBase();
   const url = base ? `${base}${path}` : path;
-
   const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-
   const ct = r.headers.get("content-type") || "";
   if (!ct.includes("application/json")) {
     throw new Error(`Non-JSON response (${ct})`);
   }
-
   return r.json();
 }
 
@@ -142,7 +129,6 @@ type DexPairResponse = {
     priceNative?: string;
   }>;
 };
-
 async function fetchDmdUsdFromDex(pairAddress: string): Promise<number> {
   const url = `https://api.dexscreener.com/latest/dex/pairs/solana/${pairAddress}?_=${Date.now()}`;
   const r = await fetch(url, { cache: "no-store" });
@@ -159,17 +145,14 @@ async function fetchDmdUsdFromDex(pairAddress: string): Promise<number> {
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null;
 }
-
 function toFeedRows(x: unknown): Record<string, unknown>[] {
   if (!Array.isArray(x)) return [];
   return x.filter(isRecord);
 }
-
 function fmtUsd(x: number): string {
   if (!Number.isFinite(x)) return "—";
   return x.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
-
 function fmtCountdown(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
   const d = Math.floor(s / 86400);
@@ -181,37 +164,29 @@ function fmtCountdown(sec: number): string {
     ? `${d}d ${pad(h)}:${pad(m)}:${pad(ss)}`
     : `${pad(h)}:${pad(m)}:${pad(ss)}`;
 }
-
 function currentDayIndex(nowTs: number): number {
   return Math.floor(nowTs / 86400);
 }
-
 function shortPk(pk: PublicKey | null | undefined): string {
   if (!pk) return "—";
   const s = pk.toBase58();
   return `${s.slice(0, 4)}…${s.slice(-4)}`;
 }
-
 function readU64LE(view: DataView, offset: number): bigint {
   const lo = view.getUint32(offset, true);
   const hi = view.getUint32(offset + 4, true);
   return (BigInt(hi) << 32n) + BigInt(lo);
 }
-
 function readBool(view: DataView, offset: number): boolean {
   return view.getUint8(offset) !== 0;
 }
-
 function slippageToBps(s: string): number {
   const n = Number(String(s || "").replace(",", "."));
   if (!Number.isFinite(n) || n <= 0) return 100;
-  const clamped = Math.max(0.1, Math.min(50, n));
-  return Math.floor(clamped * 100);
+  return Math.floor(n * 100);
 }
-
 function normalizeErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
-
   if (raw.includes("SELL_DISABLED_FRONTEND")) {
     return "Sell / DMD→SOL ist aktuell bewusst deaktiviert.";
   }
@@ -245,7 +220,6 @@ function normalizeErrorMessage(err: unknown): string {
   if (raw.includes("ExtraSellApprovalRequired")) {
     return "Zusätzliche Sell-Freigabe erforderlich.";
   }
-
   return raw;
 }
 
@@ -261,14 +235,12 @@ type VaultDecoded = {
   mint: PublicKey;
   mintDecimals: number;
 };
-
 type VaultConfigV2Decoded = {
   treasury: PublicKey;
   manualPriceLamportsPer10k: bigint;
   dynamicPricingEnabled: boolean;
   sellLive: boolean;
 };
-
 type BuyerStateDecoded = {
   totalDmd: bigint;
   lastRewardClaim: bigint;
@@ -278,7 +250,6 @@ type BuyerStateDecoded = {
   buyCountToday: bigint;
   whitelisted: boolean;
 };
-
 type BuyerStateExtV2Decoded = {
   buyCooldownUntil: bigint;
   sellWindowStart: bigint;
@@ -290,27 +261,19 @@ type BuyerStateExtV2Decoded = {
 function decodeVault(data: Buffer | Uint8Array): VaultDecoded {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let offset = 8;
-
   const owner = new PublicKey(data.slice(offset, offset + 32));
   offset += 32;
-
   const totalSupply = readU64LE(view, offset);
   offset += 8;
-
   const presaleSold = readU64LE(view, offset);
   offset += 8;
-
   const initialPriceLamportsPer10k = readU64LE(view, offset);
   offset += 8;
-
   const publicSaleActive = readBool(view, offset);
   offset += 1;
-
   const mint = new PublicKey(data.slice(offset, offset + 32));
   offset += 32;
-
   const mintDecimals = view.getUint8(offset);
-
   return {
     owner,
     totalSupply,
@@ -325,18 +288,13 @@ function decodeVault(data: Buffer | Uint8Array): VaultDecoded {
 function decodeVaultConfigV2(data: Buffer | Uint8Array): VaultConfigV2Decoded {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let offset = 8;
-
   const treasury = new PublicKey(data.slice(offset, offset + 32));
   offset += 32;
-
   const manualPriceLamportsPer10k = readU64LE(view, offset);
   offset += 8;
-
   const dynamicPricingEnabled = readBool(view, offset);
   offset += 1;
-
   const sellLive = readBool(view, offset);
-
   return {
     treasury,
     manualPriceLamportsPer10k,
@@ -348,27 +306,19 @@ function decodeVaultConfigV2(data: Buffer | Uint8Array): VaultConfigV2Decoded {
 function decodeBuyerState(data: Buffer | Uint8Array): BuyerStateDecoded {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let offset = 8;
-
   const totalDmd = readU64LE(view, offset);
   offset += 8;
-
   const lastRewardClaim = readU64LE(view, offset);
   offset += 8;
-
   const lastSell = readU64LE(view, offset);
   offset += 8;
-
   const holdingSince = readU64LE(view, offset);
   offset += 8;
-
   const lastBuyDay = readU64LE(view, offset);
   offset += 8;
-
   const buyCountToday = readU64LE(view, offset);
   offset += 8;
-
   const whitelisted = readBool(view, offset);
-
   return {
     totalDmd,
     lastRewardClaim,
@@ -385,21 +335,15 @@ function decodeBuyerStateExtV2(
 ): BuyerStateExtV2Decoded {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let offset = 8;
-
   const buyCooldownUntil = readU64LE(view, offset);
   offset += 8;
-
   const sellWindowStart = readU64LE(view, offset);
   offset += 8;
-
   const sellCountWindow = view.getUint8(offset);
   offset += 1;
-
   const extraSellApprovals = view.getUint8(offset);
   offset += 1;
-
   const firstClaimDone = readBool(view, offset);
-
   return {
     buyCooldownUntil,
     sellWindowStart,
@@ -410,21 +354,8 @@ function decodeBuyerStateExtV2(
 }
 
 // -------------------------
-// Types
-// -------------------------
-type Tab = "Dashboard" | "Trading" | "Forum" | "Leaderboard" | "Airdrop";
-type UiKind = "idle" | "info" | "success" | "error";
-
-type ChartPoint = {
-  time: string;
-  dmdUsd: number;
-  dmdAppUsd: number;
-  solUsd: number;
-};
-
-// =============================================================
 // Shared UI helpers
-// =============================================================
+// ------------------------- 
 function StatusDot({
   active,
   label,
@@ -439,11 +370,10 @@ function StatusDot({
       ? "#14f195"
       : "#ff4d4f";
 
-  const glow =
-    active == null
-      ? "0 0 0 1px rgba(255,255,255,0.16)"
-      : active
-      ? "0 0 10px rgba(20,241,149,0.9), 0 0 18px rgba(20,241,149,0.45)"
+  const glow = active == null
+    ? "0 0 0 1px rgba(255,255,255,0.16)"
+    : active
+      ? "0 0 10px rgba(20,241,149,0.75), 0 0 18px rgba(20,241,149,0.32)"
       : "0 0 10px rgba(255,77,79,0.75), 0 0 18px rgba(255,77,79,0.32)";
 
   return (
@@ -484,15 +414,15 @@ function StatusPanel({
     kind === "error"
       ? "rgba(255,77,79,0.5)"
       : kind === "success"
-      ? "rgba(20,241,149,0.45)"
+      ? "rgba(20,241,149,0.35)"
       : "rgba(245,197,66,0.35)";
 
   const bg =
     kind === "error"
-      ? "rgba(255,77,79,0.10)"
+      ? "rgba(255,77,79,0.5)"
       : kind === "success"
-      ? "rgba(20,241,149,0.10)"
-      : "rgba(245,197,66,0.08)";
+      ? "rgba(20,241,149,0.35)"
+      : "rgba(245,197,66,0.35)";
 
   const color =
     kind === "error"
@@ -758,7 +688,6 @@ function DashboardPage() {
         const pricing = await computeDmdPricing({
           lamportsPer10k: lamportsPer10k > 0 ? lamportsPer10k : undefined,
           treasuryLamports: treLamports > 0 ? treLamports : undefined,
-          manualFloorUsd: 0.01,
           treasuryWeight: 1.0,
         });
 
@@ -1147,7 +1076,6 @@ function TradingPage() {
           lamportsPer10k:
             nextPriceLamports10k > 0 ? nextPriceLamports10k : undefined,
           treasuryLamports: treLam > 0 ? treLam : undefined,
-          manualFloorUsd: 0.01,
           treasuryWeight: 1.0,
         });
 
@@ -1371,11 +1299,8 @@ function TradingPage() {
       const lamports = Math.floor(rawSol * LAMPORTS_PER_SOL);
       const bps = slippageToBps(slippagePct);
 
-      const expectedOut = Math.floor((lamports * 10_000) / priceLamports10k);
-      const minOutDmd = Math.max(
-        1,
-        Math.floor((expectedOut * (10_000 - bps)) / 10_000)
-      );
+  console.log("[DEBUG] Neuer aligned minOutDmd:", minOutDmd, "bei lamports:", lamports);
+      
 
       const swapIx = ixSwapExactSolForDmd(ixCoder, buyer, lamports, minOutDmd);
 
