@@ -1,10 +1,14 @@
 # --------------------------------------------------
-# Dependencies
+# Dependencies & node_modules
 # --------------------------------------------------
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # --------------------------------------------------
-# Build / deploy artifacts
+# Build & dist artifacts
 # --------------------------------------------------
 dist/
 dist-ssr/
@@ -14,28 +18,27 @@ coverage/
 .tmp/
 temp/
 tmp/
+build/
+out/
 
 # --------------------------------------------------
-# Logs
+# Logs & debug files
 # --------------------------------------------------
-logs/
 *.log
+*.log.*
+debug.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
 
 # --------------------------------------------------
-# Environment files
-# Keep only the public-safe template.
+# Environment & secrets (nur .env.example erlauben)
 # --------------------------------------------------
 .env
 .env.*
 !.env.example
 
 # --------------------------------------------------
-# OS / editor junk
+# Editor & OS junk
 # --------------------------------------------------
 .DS_Store
 Thumbs.db
@@ -48,7 +51,6 @@ desktop.ini
 *~
 *.tmp
 *.temp
-
 .vscode/*
 !.vscode/extensions.json
 .idea/
@@ -59,13 +61,13 @@ desktop.ini
 *.sw?
 
 # --------------------------------------------------
-# Windows zone identifier leftovers
+# Windows zone identifier
 # --------------------------------------------------
 *Zone.Identifier
 *.Zone.Identifier
 
 # --------------------------------------------------
-# Secrets / wallets / key material
+# Secrets, wallets, keys (sehr wichtig!)
 # --------------------------------------------------
 *.pem
 *.key
@@ -82,7 +84,11 @@ founder.json
 treasury.json
 admin.json
 new_upgrade.json
+protocol_owner_v2.json
+treasury_v2.json
+upgrade.json
 
+# Alle Ordner mit sensiblen Dateien komplett ignorieren
 secure/
 secure/**
 wallets/
@@ -93,6 +99,9 @@ keypairs/
 keypairs/**
 secrets/
 secrets/**
+.private/
+.private/**
+.private/**
 
 # --------------------------------------------------
 # Solana / Anchor / local chain artifacts
@@ -103,17 +112,34 @@ test-ledger/
 ledger/
 .anchor-cache/
 solana-test-validator-ledger/
+*.so  # compiled Anchor programs
 
 # --------------------------------------------------
-# Misc tooling
+# Backups & temp files (dein Backups-Ordner!)
+# --------------------------------------------------
+backups/
+backups/**
+*.backup
+*.bak
+*.old
+*.tmp.*
+~*
+
+# --------------------------------------------------
+# Misc tooling & caches
 # --------------------------------------------------
 .vercel/
 .netlify/
 .turbo/
 .eslintcache
+.yarn/cache
+.yarn/unplugged
+.yarn/install-state.gz
+.pnpm-store/
+pnpm-lock.yaml  # wenn du pnpm nutzt – sonst auskommentieren
 
 # --------------------------------------------------
-# Keep source IDL versioned
+# Keep source IDL versioned (gut so!)
 # --------------------------------------------------
 !src/idl/
 !src/idl/dmd_anchor.json
