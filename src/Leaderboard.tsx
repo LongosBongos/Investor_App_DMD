@@ -1,4 +1,6 @@
 // src/Leaderboard.tsx
+// ELITE ASSET-MANAGER EDITION — Premium On-Chain Holder Leaderboard
+// Gold-Akzente, moderne Tabelle, Hover-Glow, Rank-Badges, Live-Indicator
 import React, { useEffect, useMemo, useState } from "react";
 import { Commitment, Connection, PublicKey } from "@solana/web3.js";
 import {
@@ -38,17 +40,15 @@ type HolderRow = {
 function getRpcUrl(): string {
   const envRpc = import.meta.env.VITE_RPC_URL?.trim();
   const rpc = envRpc && envRpc.length > 0 ? envRpc : DEFAULT_RPC;
-
   if (rpc.includes("api-key=") || rpc.includes("apiKey=")) {
     throw new Error(
       "SECURITY: VITE_RPC_URL contains api-key. Remove it and use a keyless endpoint or a backend proxy."
     );
   }
-
   return rpc;
 }
 
-function shortPk(pk: string, a = 6, b = 6): string {
+function shortPk(pk: string, a = 8, b = 8): string {
   return `${pk.slice(0, a)}…${pk.slice(-b)}`;
 }
 
@@ -67,43 +67,6 @@ function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
 }
 
-function isRecord(x: unknown): x is Record<string, unknown> {
-  return typeof x === "object" && x !== null;
-}
-
-function getParsedOwner(parsed: unknown): string | null {
-  if (!isRecord(parsed)) return null;
-  const info = parsed.info;
-  if (!isRecord(info)) return null;
-  const owner = info.owner;
-  return typeof owner === "string" ? owner : null;
-}
-
-async function getMintSupplyUi(connection: Connection, mint: PublicKey): Promise<number> {
-  const s = await connection.getTokenSupply(mint, CONFIRMED);
-  return Number(s.value.uiAmount ?? 0);
-}
-
-async function getOwnerOfTokenAccount(
-  connection: Connection,
-  tokenAccount: PublicKey
-): Promise<string | null> {
-  const ai = await connection.getParsedAccountInfo(tokenAccount, CONFIRMED);
-  const data = ai.value?.data;
-  if (!isRecord(data)) return null;
-  const parsed = data.parsed;
-  if (!isRecord(parsed)) return null;
-  return getParsedOwner(parsed);
-}
-
-async function getUiAmountOfTokenAccount(
-  connection: Connection,
-  tokenAccount: PublicKey
-): Promise<number> {
-  const b = await connection.getTokenAccountBalance(tokenAccount, CONFIRMED);
-  return Number(b.value.uiAmount ?? 0);
-}
-
 export default function Leaderboard(): JSX.Element {
   const [rows, setRows] = useState<HolderRow[]>([]);
   const [supplyUi, setSupplyUi] = useState<number>(0);
@@ -117,7 +80,6 @@ export default function Leaderboard(): JSX.Element {
   }, []);
 
   const vault = useMemo(() => findVaultPda(), []);
-
   const systemOwners = useMemo(() => {
     return new Set<string>([
       PROTOCOL_OWNER.toBase58(),
@@ -133,32 +95,25 @@ export default function Leaderboard(): JSX.Element {
 
   useEffect(() => {
     let alive = true;
-
     async function pull() {
       try {
         setErr("");
-
-        const s = await getMintSupplyUi(connection, DMD_MINT);
+        const s = await connection.getTokenSupply(DMD_MINT, CONFIRMED);
+        const supply = Number(s.value.uiAmount ?? 0);
         if (!alive) return;
-        setSupplyUi(s);
+        setSupplyUi(supply);
 
         const largest = await connection.getTokenLargestAccounts(DMD_MINT, CONFIRMED);
         if (!alive) return;
 
         const top = largest.value.slice(0, MAX_LARGEST_ACCOUNTS);
-
         const enriched = await Promise.all(
           top.map(async (x) => {
             const ta = x.address;
             const tokenAccount = ta.toBase58();
-
-            const uiMaybe = (x as unknown as { uiAmount?: number }).uiAmount;
-            const amount =
-              typeof uiMaybe === "number" && Number.isFinite(uiMaybe) && uiMaybe > 0
-                ? uiMaybe
-                : await getUiAmountOfTokenAccount(connection, ta);
-
-            const owner = await getOwnerOfTokenAccount(connection, ta);
+            const amount = Number(x.uiAmount ?? 0) || 0;
+            const ownerInfo = await connection.getParsedAccountInfo(ta, CONFIRMED);
+            const owner = (ownerInfo.value?.data as any)?.parsed?.info?.owner || "";
             return { tokenAccount, owner, amount };
           })
         );
@@ -166,20 +121,20 @@ export default function Leaderboard(): JSX.Element {
         if (!alive) return;
 
         const cleaned = enriched
-          .filter((it) => typeof it.owner === "string" && !!it.owner && it.amount > 0)
+          .filter((it) => it.owner && it.amount > 0)
           .filter((it) => {
             if (!excludeSystemWallets) return true;
-            if (systemOwners.has(it.owner as string)) return false;
+            if (systemOwners.has(it.owner)) return false;
             if (systemTokenAccounts.has(it.tokenAccount)) return false;
             return true;
           })
-          .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
+          .sort((a, b) => b.amount - a.amount);
 
         const finalRows: HolderRow[] = cleaned.slice(0, MAX_ROWS).map((it, idx) => {
-          const pct = s > 0 ? (it.amount / s) * 100 : 0;
+          const pct = supply > 0 ? (it.amount / supply) * 100 : 0;
           return {
             rank: idx + 1,
-            owner: it.owner as string,
+            owner: it.owner,
             tokenAccount: it.tokenAccount,
             amount: it.amount,
             pct,
@@ -197,10 +152,7 @@ export default function Leaderboard(): JSX.Element {
     }
 
     void pull();
-    const iv = window.setInterval(() => {
-      void pull();
-    }, 20_000);
-
+    const iv = window.setInterval(() => void pull(), 20000);
     return () => {
       alive = false;
       window.clearInterval(iv);
@@ -208,8 +160,7 @@ export default function Leaderboard(): JSX.Element {
   }, [connection, excludeSystemWallets, systemOwners, systemTokenAccounts]);
 
   const maxPct = useMemo(() => {
-    const m = rows.reduce((acc, r) => Math.max(acc, r.pct), 0);
-    return m > 0 ? m : 1;
+    return rows.length ? Math.max(...rows.map((r) => r.pct)) : 1;
   }, [rows]);
 
   return (
@@ -221,6 +172,7 @@ export default function Leaderboard(): JSX.Element {
           justifyContent: "space-between",
           gap: 12,
           flexWrap: "wrap",
+          marginBottom: 16,
         }}
       >
         <div>
@@ -228,32 +180,32 @@ export default function Leaderboard(): JSX.Element {
             DMD HOLDER
           </div>
           <div className="panel-title" style={{ color: "var(--gold)", marginTop: 6 }}>
-            On-Chain Holder Leaderboard
+            On-Chain Leaderboard
           </div>
           <div className="small muted" style={{ marginTop: 6 }}>
             Supply: {supplyUi ? fmtNum(supplyUi, 0) : "—"} DMD
-            {lastUpdate ? ` · Update: ${lastUpdate}` : ""}
+            {lastUpdate && ` · Update: ${lastUpdate}`}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <label
             className="small muted"
-            style={{ display: "flex", gap: 8, alignItems: "center" }}
+            style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}
           >
             <input
               type="checkbox"
               checked={excludeSystemWallets}
               onChange={(e) => setExcludeSystemWallets(e.target.checked)}
             />
-            Exclude Protocol Owner / Treasury / Vault
+            Exclude Protocol / Treasury / Vault
           </label>
-
           <a
             className="btn"
             href={`https://solscan.io/token/${DMD_MINT.toBase58()}`}
             target="_blank"
             rel="noreferrer"
+            style={{ color: "var(--gold)" }}
           >
             Open Solscan
           </a>
@@ -261,105 +213,105 @@ export default function Leaderboard(): JSX.Element {
       </div>
 
       {err && (
-        <div className="panel" style={{ marginTop: 16 }}>
-          <p className="small" style={{ color: "#ffb4b4" }}>
-            Fehler: {err}
-          </p>
+        <div className="panel" style={{ marginTop: 16, color: "#ffb4b4" }}>
+          Fehler: {err}
         </div>
       )}
 
-      <div className="panel" style={{ marginTop: 18 }}>
-        <div className="panel-title">Top Holder (Wallets)</div>
+      <div
+        className="panel"
+        style={{
+          background: "rgba(15,15,15,0.98)",
+          border: "1px solid rgba(255,215,0,0.12)",
+          padding: "24px",
+          borderRadius: 16,
+        }}
+      >
+        <div className="panel-title" style={{ marginBottom: 16 }}>
+          TOP HOLDERS (Wallets)
+        </div>
 
-        <div style={{ marginTop: 12, overflowX: "auto" }}>
+        <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ color: "rgba(255,255,255,0.6)", textAlign: "left" }}>
-                <th style={{ padding: "10px 8px", width: 48 }}>#</th>
-                <th style={{ padding: "10px 8px" }}>Wallet</th>
-                <th style={{ padding: "10px 8px", textAlign: "right" }}>DMD</th>
-                <th style={{ padding: "10px 8px", textAlign: "right" }}>% Supply</th>
-                <th style={{ padding: "10px 8px", textAlign: "right" }}>Share</th>
-                <th style={{ padding: "10px 8px", textAlign: "right" }}>Links</th>
+              <tr style={{ color: "#aaa", textAlign: "left", fontSize: "12px", fontWeight: 600 }}>
+                <th style={{ padding: "12px 8px", width: 60 }}>#</th>
+                <th style={{ padding: "12px 8px" }}>WALLET</th>
+                <th style={{ padding: "12px 8px", textAlign: "right" }}>DMD</th>
+                <th style={{ padding: "12px 8px", textAlign: "right" }}>% SUPPLY</th>
+                <th style={{ padding: "12px 8px", textAlign: "right", width: 180 }}>SHARE</th>
+                <th style={{ padding: "12px 8px", textAlign: "right" }}>LINKS</th>
               </tr>
             </thead>
-
             <tbody>
               {rows.map((r) => {
-                const bar = clamp01(r.pct / maxPct);
-
+                const barWidth = clamp01(r.pct / maxPct) * 100;
                 return (
                   <tr
                     key={r.tokenAccount}
                     style={{
                       borderTop: "1px solid rgba(255,255,255,0.08)",
-                      color: "rgba(255,255,255,0.9)",
+                      transition: "background 0.2s",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(245,197,66,0.08)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
-                    <td style={{ padding: "10px 8px" }}>
+                    <td style={{ padding: "14px 8px" }}>
                       <span
                         style={{
                           display: "inline-flex",
-                          minWidth: 28,
+                          minWidth: 32,
                           justifyContent: "center",
-                          padding: "3px 8px",
+                          padding: "4px 10px",
                           borderRadius: 999,
-                          border: "1px solid rgba(255,255,255,0.12)",
-                          background: "rgba(245,197,66,0.10)",
-                          color: "var(--gold)",
-                          fontWeight: 700,
+                          background: "rgba(245,197,66,0.15)",
+                          color: "#f5c542",
+                          fontWeight: 800,
+                          fontSize: "13px",
                         }}
                       >
                         {r.rank}
                       </span>
                     </td>
-
-                    <td style={{ padding: "10px 8px" }}>
-                      <div style={{ fontFamily: "monospace", fontSize: 13 }}>
-                        {shortPk(r.owner, 8, 8)}
-                      </div>
-                      <div className="small muted" style={{ marginTop: 4 }}>
-                        {r.owner}
+                    <td style={{ padding: "14px 8px" }}>
+                      <div style={{ fontFamily: "monospace", fontSize: "13px", color: "#ddd" }}>
+                        {shortPk(r.owner)}
                       </div>
                     </td>
-
-                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>
+                    <td style={{ padding: "14px 8px", textAlign: "right", fontWeight: 700 }}>
                       {fmtNum(r.amount, 0)}
                     </td>
-
-                    <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                    <td style={{ padding: "14px 8px", textAlign: "right", color: "#aaa" }}>
                       {fmtPct(r.pct)}
                     </td>
-
-                    <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                    <td style={{ padding: "14px 8px", textAlign: "right" }}>
                       <div
                         style={{
-                          height: 10,
-                          width: 140,
-                          borderRadius: 999,
+                          height: 8,
+                          width: 160,
                           background: "rgba(255,255,255,0.08)",
+                          borderRadius: 999,
                           overflow: "hidden",
                           display: "inline-block",
-                          verticalAlign: "middle",
                         }}
-                        title={fmtPct(r.pct)}
                       >
                         <div
                           style={{
                             height: "100%",
-                            width: `${bar * 100}%`,
-                            background: "rgba(245,197,66,0.85)",
+                            width: `${barWidth}%`,
+                            background: "linear-gradient(90deg, #f5c542, #d8b23a)",
+                            borderRadius: 999,
+                            transition: "width 1s ease",
                           }}
                         />
                       </div>
                     </td>
-
-                    <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                    <td style={{ padding: "14px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
                       <a
                         href={`https://solscan.io/account/${r.owner}`}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ color: "var(--gold)", marginRight: 10 }}
+                        style={{ color: "var(--gold)", marginRight: 12 }}
                       >
                         Wallet
                       </a>
@@ -367,9 +319,9 @@ export default function Leaderboard(): JSX.Element {
                         href={`https://solscan.io/account/${r.tokenAccount}`}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ color: "rgba(255,255,255,0.75)" }}
+                        style={{ color: "#aaa" }}
                       >
-                        TokenAcc
+                        Token
                       </a>
                     </td>
                   </tr>
@@ -378,8 +330,8 @@ export default function Leaderboard(): JSX.Element {
 
               {!rows.length && !err && (
                 <tr>
-                  <td colSpan={6} style={{ padding: 12, color: "rgba(255,255,255,0.55)" }}>
-                    Lade Holder…
+                  <td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#666" }}>
+                    Lade Top Holder…
                   </td>
                 </tr>
               )}
@@ -387,10 +339,10 @@ export default function Leaderboard(): JSX.Element {
           </table>
         </div>
 
-        <p className="small muted" style={{ marginTop: 12, lineHeight: 1.5 }}>
-          Hinweis: Das Ranking basiert auf <code>getTokenLargestAccounts</code> und damit auf SPL-Token-Accounts,
-          nicht auf einer perfekten wirtschaftlichen Gruppierung verbundener Wallets.
-        </p>
+        <div className="small muted" style={{ marginTop: 20, lineHeight: 1.6 }}>
+          Hinweis: Das Ranking basiert auf <code>getTokenLargestAccounts</code>. 
+          System-Wallets (Vault, Treasury, Protocol Owner) sind standardmäßig ausgeblendet.
+        </div>
       </div>
     </div>
   );

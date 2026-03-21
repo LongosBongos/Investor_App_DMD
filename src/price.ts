@@ -1,7 +1,7 @@
 // src/price.ts
 // Hardened + kompatibel zu App.tsx + lib.rs aligned + dynamisch mit SOL-Preis
 // RPC LEAK-PROOF via VITE_RPC_URL (Key nie mehr im Code!)
-
+// MIT DEUTLICH MEHR VALIDIERUNG (Längen-Checks, Range-Checks, Treasury-Validierung, Zero-Division-Schutz, Sanity-Checks)
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { PROGRAM_ID, TREASURY, DMD_MINT, findVaultPda, findVaultConfigV2Pda, ataFor as ataOf } from "./solana";
 
@@ -29,25 +29,66 @@ export async function fetchSolUsd(): Promise<number> {
   }
 }
 
-// VaultConfigV2 Decoder (1:1 lib.rs)
-function decodeVaultConfigV2(data: Buffer) {
+// ===============================================
+// ERWEITERTER + STARK VALIDIERENDER VaultConfigV2 Decoder
+// ===============================================
+function decodeVaultConfigV2(data: Buffer): {
+  treasury: PublicKey;
+  manualPriceLamportsPer10k: number;
+  dynamicPricingEnabled: boolean;
+  sellLive: boolean;
+  bump?: number;
+} {
+  // 1. Längen-Validierung
+  if (!data || data.length < 8 + 32 + 8 + 1 + 1) {
+    console.error("[price-error] VaultConfigV2 Daten zu kurz! Erwartet mind. 50 Bytes, erhalten:", data?.length ?? 0);
+    throw new Error("Invalid VaultConfigV2 account data length");
+  }
+
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  let offset = 8;
+  let offset = 8; // discriminator
+
   const treasury = new PublicKey(data.subarray(offset, offset + 32));
   offset += 32;
+
   const manualPriceLamportsPer10k = Number(view.getBigUint64(offset, true));
   offset += 8;
+
   const dynamicPricingEnabled = view.getUint8(offset) !== 0;
   offset += 1;
+
   const sellLive = view.getUint8(offset) !== 0;
+  offset += 1;
 
-  console.log("[price-debug] VaultConfigV2 gelesen → manualPriceLamportsPer10k =", manualPriceLamportsPer10k);
+  const bump = data.length > offset ? view.getUint8(offset) : undefined;
 
-  return { manualPriceLamportsPer10k, dynamicPricingEnabled, sellLive };
+  // 2. Range- & Sanity-Validierung
+  if (manualPriceLamportsPer10k <= 0 || manualPriceLamportsPer10k > 100_000_000_000) {
+    console.warn("[price-warning] manualPriceLamportsPer10k außerhalb sinnvoller Range:", manualPriceLamportsPer10k);
+  }
+  if (treasury.equals(PublicKey.default)) {
+    console.warn("[price-warning] Treasury ist zero-address – mögliche Fehlkonfiguration!");
+  }
+
+  console.log("[price-debug] VaultConfigV2 VALIDATED →", {
+    manualPriceLamportsPer10k,
+    dynamicPricingEnabled,
+    sellLive,
+    treasury: treasury.toBase58().slice(0, 8) + "...",
+    bump
+  });
+
+  return {
+    treasury,
+    manualPriceLamportsPer10k,
+    dynamicPricingEnabled,
+    sellLive,
+    bump
+  };
 }
 
 // ===============================================
-// computeDmdPricing – EXAKT wie App.tsx es erwartet
+// computeDmdPricing – MIT NOCH MEHR VALIDIERUNG
 // ===============================================
 export async function computeDmdPricing(params: {
   lamportsPer10k?: number;
@@ -56,16 +97,12 @@ export async function computeDmdPricing(params: {
 } = {}) {
   const notes: string[] = [];
   const solUsd = await fetchSolUsd();
-
-  let usdPerDmd = 0.01; // absoluter Fallback
+  let usdPerDmd = 0.01;
 
   try {
     const connection = new Connection(getRpcUrl(), "confirmed");
     const vaultPda = findVaultPda();
-    const [vaultConfigPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("vault_config_v2"), vaultPda.toBuffer()],
-      PROGRAM_ID
-    );
+    const vaultConfigPda = findVaultConfigV2Pda(vaultPda);
 
     const [configInfo, treasuryLamportsOnChain, vaultTokenBal] = await Promise.all([
       connection.getAccountInfo(vaultConfigPda),
@@ -73,19 +110,36 @@ export async function computeDmdPricing(params: {
       connection.getTokenAccountBalance(ataOf(vaultPda, DMD_MINT)).catch(() => ({ value: { uiAmount: 0 } })),
     ]);
 
-    // Params aus App.tsx haben Vorrang, dann Chain
+    // Validierung: Config-Account muss existieren
+    if (!configInfo?.data) {
+      throw new Error("VaultConfigV2 account not found or empty");
+    }
+
     let base = params.lamportsPer10k || 1_000_000_000;
-    if (configInfo?.data) {
-      const config = decodeVaultConfigV2(configInfo.data);
-      if (config.manualPriceLamportsPer10k > 0) {
-        base = config.manualPriceLamportsPer10k;
-        notes.push(`✅ VaultConfigV2 override: ${base} lamports/10k`);
-      }
+    const config = decodeVaultConfigV2(configInfo.data);
+
+    if (config.manualPriceLamportsPer10k > 0) {
+      base = config.manualPriceLamportsPer10k;
+      notes.push(`✅ VaultConfigV2 override: ${base} lamports/10k (sellLive=${config.sellLive})`);
+    }
+
+    // Treasury & Circulating Validierung
+    const circulating = vaultTokenBal.value.uiAmount || 0;
+    if (circulating <= 0) {
+      console.warn("[price-warning] Circulating Supply = 0 – Fallback verwendet");
     }
 
     const treasurySol = (params.treasuryLamports ?? treasuryLamportsOnChain) / LAMPORTS_PER_SOL;
-    const vaultDmd = vaultTokenBal.value.uiAmount || 0;
+    if (treasurySol < 0) throw new Error("Invalid treasury balance");
 
+    let treasuryBackingUsd = 0;
+    if (circulating > 0 && treasurySol > 0) {
+      treasuryBackingUsd = (treasurySol * solUsd) / circulating;
+      notes.push(`Treasury Backing: $${treasuryBackingUsd.toFixed(8)} USD/DMD`);
+    }
+
+    // Surcharge Validierung
+    const vaultDmd = vaultTokenBal.value.uiAmount || 0;
     let surcharge = 0;
     if (treasurySol < 10) surcharge += 1000;
     else if (treasurySol < 25) surcharge += 500;
@@ -94,34 +148,45 @@ export async function computeDmdPricing(params: {
 
     const effective = Math.floor(base * (10000 + surcharge) / 10000);
     const lamportsPerDmd = effective / 10_000;
-    usdPerDmd = (lamportsPerDmd / LAMPORTS_PER_SOL) * solUsd;
+    const effectivePriceUsd = (lamportsPerDmd / LAMPORTS_PER_SOL) * solUsd;
 
-    notes.push(`Surcharge: ${surcharge} bps | Effective: ${effective} | SOL: ${solUsd}`);
+    const treasuryWeight = Math.max(0, Math.min(1, params.treasuryWeight ?? 0.6));
+    const finalUsd = (treasuryBackingUsd * treasuryWeight) + (effectivePriceUsd * (1 - treasuryWeight));
+
+    usdPerDmd = Math.max(effectivePriceUsd, finalUsd);
+
+    notes.push(`Surcharge: ${surcharge} bps | Effective: ${effective} | Weighted Final: ${usdPerDmd.toFixed(8)}`);
   } catch (e) {
     notes.push(`On-chain fetch failed – fallback to 0.01 USD`);
     console.error("[price-error]", e);
   }
 
-  const usdPerDmdFinal = Math.max(0.0001, Math.min(0.3, usdPerDmd || 0.01)); // max 0.3$ statt 0.1$
+  const usdPerDmdFinal = Math.max(0.0001, Math.min(0.3, usdPerDmd || 0.01));
 
-  console.log("[price-aligned]", { 
-    usdPerDmdFinal: usdPerDmdFinal.toFixed(6), 
-    solUsd, 
-    notes 
+  console.log("[price-aligned FULL WITH VALIDATION]", {
+    usdPerDmdFinal: usdPerDmdFinal.toFixed(8),
+    solUsd,
+    notes
   });
 
   return { usdPerDmdFinal };
 }
 
-// Trading-Vorschau (wird von App.tsx benutzt)
+// Trading-Vorschau (mit Zero-Division-Schutz)
 export async function calculateAlignedMinOutDmd(
   solLamports: number,
   slippageBps: number = 100
 ): Promise<number> {
+  if (solLamports <= 0) throw new Error("solLamports must be > 0");
+
   const pricing = await computeDmdPricing();
   const usdPerDmd = pricing.usdPerDmdFinal;
 
-  // KORREKTE Formel (ohne /89-Hack!)
+  if (usdPerDmd <= 0) {
+    console.warn("[price-warning] usdPerDmd <= 0 – Fallback 0.01");
+    return Math.max(1, Math.floor((solLamports / LAMPORTS_PER_SOL) * 100));
+  }
+
   const dmdAmount = (solLamports / LAMPORTS_PER_SOL) / usdPerDmd;
   const minOut = Math.floor(dmdAmount * (1 - slippageBps / 10000));
 

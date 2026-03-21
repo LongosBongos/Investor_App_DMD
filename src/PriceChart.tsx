@@ -1,3 +1,6 @@
+// src/PriceChart.tsx
+// ELITE ASSET-MANAGER EDITION — Professionell, clean, premium dark mode
+// Vollständig überarbeitet: bessere Typografie, Gold-Akzente, Toggle-Switches, Hover-Effekte, Tooltip-Upgrade
 import React, { useMemo, useState } from "react";
 import {
   ResponsiveContainer,
@@ -8,12 +11,13 @@ import {
   Tooltip,
   Brush,
   Legend,
+  CartesianGrid,
 } from "recharts";
 
 type Point = {
   time: string;
-  dmdUsd: number;      // Market (DEX)
-  dmdAppUsd: number;   // App/Fair Value
+  dmdUsd: number;     // Market (DEX)
+  dmdAppUsd: number;  // App/Fair Value
   solUsd?: number;
 };
 
@@ -37,74 +41,68 @@ export default function PriceChart({ data }: { data: Point[] }) {
     };
   }, [last]);
 
-  // Empty-State falls noch keine Daten
+  // Empty State (premium)
   if (data.length === 0) {
     return (
-      <div className="card p-4 panel" style={{ height: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="card p-4 panel" style={{ height: 380, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,15,15,0.95)" }}>
         <div className="text-center">
-          <div className="text-white/60 text-sm">Noch keine Preisdaten</div>
-          <div className="text-xs text-white/40 mt-1">Die ersten Punkte erscheinen in wenigen Sekunden...</div>
+          <div className="text-white/70 text-base font-medium">Preis-Chart wird geladen...</div>
+          <div className="text-xs text-white/40 mt-2">Erste Daten erscheinen in Sekunden</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="card p-4 panel">
-      {/* Header mit Preisen */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+    <div className="card p-6 panel" style={{ background: "rgba(15,15,15,0.98)", border: "1px solid rgba(255,215,0,0.08)" }}>
+      {/* Premium Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <div className="text-white font-semibold text-lg">DMD Price (USD)</div>
-          <div className="text-xs text-white/60 mt-1">
-            Market: <span style={{ color: "#f5c542" }}>{header.market}</span>
-            {showApp && (
-              <>
-                {" · "}App: <span style={{ color: "#7CFFB2" }}>{header.app}</span>
-              </>
-            )}
-            {showSol && (
-              <>
-                {" · "}SOL: <span style={{ color: "#6aa9ff" }}>{header.sol}</span>
-              </>
-            )}
+          <div className="text-white font-semibold text-2xl tracking-tight">DMD PRICE</div>
+          <div className="text-xs text-white/60 mt-1 flex items-center gap-3">
+            <span>Market: <span style={{ color: "#f5c542", fontWeight: 700 }}>{header.market}</span></span>
+            {showApp && <span>· App: <span style={{ color: "#7CFFB2", fontWeight: 700 }}>{header.app}</span></span>}
+            {showSol && <span>· SOL: <span style={{ color: "#6aa9ff", fontWeight: 700 }}>{header.sol}</span></span>}
           </div>
         </div>
 
-        {/* Toggle Buttons – im gleichen Style wie deine App */}
-        <div style={{ display: "flex", gap: 8 }}>
+        {/* Elite Toggle Switches */}
+        <div style={{ display: "flex", gap: 8, background: "rgba(30,30,30,0.8)", padding: "4px", borderRadius: 999 }}>
           <button
-            className={`btn ${showApp ? "active" : ""}`}
             onClick={() => setShowApp((v) => !v)}
-            style={{ padding: "6px 14px", fontSize: "13px" }}
+            className={`px-5 py-1.5 text-xs font-medium rounded-full transition-all ${showApp ? "bg-[#7CFFB2] text-black" : "text-white/70 hover:text-white"}`}
           >
-            App Line
+            APP LINE
           </button>
           <button
-            className={`btn ${showSol ? "active" : ""}`}
             onClick={() => setShowSol((v) => !v)}
-            style={{ padding: "6px 14px", fontSize: "13px" }}
+            className={`px-5 py-1.5 text-xs font-medium rounded-full transition-all ${showSol ? "bg-[#6aa9ff] text-black" : "text-white/70 hover:text-white"}`}
           >
-            SOL Line
+            SOL LINE
           </button>
         </div>
       </div>
 
-      {/* Chart */}
-      <div style={{ width: "100%", height: 300, marginTop: 16 }}>
+      {/* Chart Container */}
+      <div style={{ width: "100%", height: 340 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
+          <LineChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+            
             <XAxis
               dataKey="time"
-              tick={{ fill: "#9aa", fontSize: 10 }}
+              tick={{ fill: "#888", fontSize: 11 }}
               tickLine={{ stroke: "#333" }}
+              axisLine={{ stroke: "#333" }}
             />
 
             {/* DMD Y-Achse (links) */}
             <YAxis
               yAxisId="dmd"
-              tick={{ fill: "#9aa", fontSize: 10 }}
-              tickFormatter={(v) => Number(v).toFixed(4)}
+              tick={{ fill: "#aaa", fontSize: 11 }}
+              tickFormatter={(v) => `$${Number(v).toFixed(4)}`}
               domain={[0, "auto"]}
+              axisLine={{ stroke: "#333" }}
             />
 
             {/* SOL Y-Achse (rechts) */}
@@ -112,79 +110,87 @@ export default function PriceChart({ data }: { data: Point[] }) {
               <YAxis
                 yAxisId="sol"
                 orientation="right"
-                tick={{ fill: "#9aa", fontSize: 10 }}
+                tick={{ fill: "#aaa", fontSize: 11 }}
                 tickFormatter={(v) => Number(v).toFixed(0)}
                 domain={[0, "auto"]}
+                axisLine={{ stroke: "#333" }}
               />
             )}
 
+            {/* Premium Tooltip */}
             <Tooltip
               contentStyle={{
-                background: "#1a1a1a",
-                border: "1px solid #333",
-                borderRadius: 8,
+                background: "#111",
+                border: "1px solid #444",
+                borderRadius: 12,
+                boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+                padding: "12px 16px",
               }}
-              formatter={(value: any, name: string) => {
-                const n = Number(value);
-                if (name === "dmdUsd") return [fmtUsd(n, 6), "DMD/USD (Market)"];
-                if (name === "dmdAppUsd") return [fmtUsd(n, 6), "DMD/USD (App)"];
-                if (name === "solUsd") return [fmtUsd(n, 2), "SOL/USD"];
-                return [String(value), String(name)];
+              formatter={(value: number, name: string) => {
+                if (name === "dmdUsd") return [fmtUsd(value, 6), "Market (DEX)"];
+                if (name === "dmdAppUsd") return [fmtUsd(value, 6), "App / Fair Value"];
+                if (name === "solUsd") return [fmtUsd(value, 2), "SOL Price"];
+                return [value, name];
               }}
-              labelFormatter={(label) => `Zeit: ${label}`}
+              labelFormatter={(label) => `📅 ${label}`}
             />
 
-            <Legend />
+            <Legend verticalAlign="top" height={36} iconType="circle" />
 
-            {/* Market Line */}
+            {/* Market Line (gold) */}
             <Line
               yAxisId="dmd"
-              type="monotone"
+              type="natural"
               dataKey="dmdUsd"
               name="DMD/USD (Market)"
               stroke="#f5c542"
-              strokeWidth={2.5}
+              strokeWidth={3}
               dot={false}
+              activeDot={{ r: 6, fill: "#f5c542", stroke: "#000" }}
               isAnimationActive={false}
             />
 
-            {/* App Line (gestrichelt) */}
+            {/* App Line (grün, gestrichelt) */}
             {showApp && (
               <Line
                 yAxisId="dmd"
-                type="monotone"
+                type="natural"
                 dataKey="dmdAppUsd"
                 name="DMD/USD (App)"
                 stroke="#7CFFB2"
-                strokeWidth={2}
-                strokeDasharray="6 4"
+                strokeWidth={2.5}
+                strokeDasharray="7 3"
                 dot={false}
+                activeDot={{ r: 5, fill: "#7CFFB2" }}
                 isAnimationActive={false}
               />
             )}
 
-            {/* SOL Line */}
+            {/* SOL Line (blau) */}
             {showSol && (
               <Line
                 yAxisId="sol"
-                type="monotone"
+                type="natural"
                 dataKey="solUsd"
                 name="SOL/USD"
                 stroke="#6aa9ff"
-                strokeWidth={1.5}
+                strokeWidth={1.8}
                 dot={false}
+                activeDot={{ r: 4, fill: "#6aa9ff" }}
                 isAnimationActive={false}
               />
             )}
 
-            <Brush dataKey="time" height={20} travellerWidth={8} stroke="#555" />
+            <Brush dataKey="time" height={22} travellerWidth={10} stroke="#555" fill="#1a1a1a" />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Footer Hinweis */}
-      <div className="text-xs text-white/50 mt-3 text-center">
-        Zoom mit Brush unten • App-Line = Treasury + Dynamic Pricing • Market = DEX
+      {/* Footer – professionell */}
+      <div className="text-xs text-white/50 mt-4 text-center flex items-center justify-center gap-4">
+        <span>Zoom mit Brush • App-Line = Treasury + Dynamic Pricing</span>
+        <span className="text-[#7CFFB2]">● Market (DEX)</span>
+        <span className="text-[#7CFFB2]">● App Value</span>
       </div>
     </div>
   );

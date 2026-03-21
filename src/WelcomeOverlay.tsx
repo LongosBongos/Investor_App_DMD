@@ -2,9 +2,14 @@ import { useEffect, useState } from "react";
 
 export default function WelcomeOverlay() {
   const [show, setShow] = useState(true);
+  const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setShow(false), 2600);
+    const timer = window.setTimeout(() => {
+      setFadeOut(true);
+      setTimeout(() => setShow(false), 420); // sanfter Fade-Out
+    }, 2600);
+
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -22,88 +27,82 @@ export default function WelcomeOverlay() {
         alignItems: "center",
         justifyContent: "center",
         background:
-          "radial-gradient(circle at 50% 35%, rgba(18,24,35,0.88) 0%, rgba(5,7,11,0.96) 45%, #05070b 100%)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
+          "radial-gradient(circle at 50% 32%, rgba(18,24,35,0.92) 0%, rgba(5,7,11,0.98) 48%, #05070b 100%)",
+        backdropFilter: "blur(14px)",
+        WebkitBackdropFilter: "blur(14px)",
         padding: "24px",
+        transition: fadeOut ? "opacity 420ms cubic-bezier(0.23,1,0.32,1), transform 420ms cubic-bezier(0.23,1,0.32,1)" : "none",
+        opacity: fadeOut ? 0 : 1,
+        transform: fadeOut ? "scale(0.96)" : "scale(1)",
       }}
     >
       <div
         style={{
-          width: "min(94vw, 640px)",
+          width: "min(94vw, 680px)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           textAlign: "center",
-          padding: "52px 34px",
-          borderRadius: 28,
+          padding: "58px 40px 52px",
+          borderRadius: 32,
           background:
-            "linear-gradient(180deg, rgba(15,18,24,0.78), rgba(5,7,11,0.72))",
-          border: "1px solid rgba(245,197,66,0.14)",
+            "linear-gradient(180deg, rgba(15,18,24,0.82) 0%, rgba(5,7,11,0.78) 100%)",
+          border: "1px solid rgba(245,197,66,0.18)",
           boxShadow:
-            "0 24px 80px rgba(0,0,0,0.58), 0 0 40px rgba(245,197,66,0.06)",
+            "0 30px 90px rgba(0,0,0,0.65), 0 0 60px rgba(245,197,66,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
+          transition: "transform 0.4s cubic-bezier(0.23,1,0.32,1)",
         }}
       >
+        {/* Premium Logo Circle */}
         <div
           style={{
-            fontSize: 12,
-            fontWeight: 700,
-            letterSpacing: "0.28em",
-            textTransform: "uppercase",
-            color: "rgba(245,197,66,0.78)",
-            marginBottom: 18,
-          }}
-        >
-          Premium Trading Platform
-        </div>
-
-        <div
-          style={{
-            width: 156,
-            height: 156,
+            width: 172,
+            height: 172,
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             background:
-              "radial-gradient(circle at 50% 50%, rgba(245,197,66,0.10) 0%, rgba(245,197,66,0.03) 45%, rgba(245,197,66,0.00) 72%)",
+              "radial-gradient(circle at 50% 50%, rgba(245,197,66,0.14) 0%, rgba(245,197,66,0.04) 52%, transparent 78%)",
             boxShadow:
-              "0 0 0 1px rgba(245,197,66,0.10), 0 0 30px rgba(245,197,66,0.08)",
-            marginBottom: 28,
+              "0 0 0 1px rgba(245,197,66,0.22), 0 0 42px rgba(245,197,66,0.12)",
+            marginBottom: 32,
             overflow: "hidden",
-            flexShrink: 0,
+            animation: "logoPulse 2.8s ease-in-out infinite",
           }}
         >
           <img
             src={logoUrl}
-            alt="DMD"
+            alt="DMD Logo"
             style={{
-              width: 112,
-              height: 112,
+              width: 124,
+              height: 124,
               objectFit: "contain",
-              display: "block",
-              opacity: 0.96,
-              filter: "drop-shadow(0 0 10px rgba(245,197,66,0.12))",
+              filter: "drop-shadow(0 0 14px rgba(245,197,66,0.25))",
+              transition: "transform 0.6s cubic-bezier(0.23,1,0.32,1)",
             }}
             onError={(e) => {
-              e.currentTarget.style.display = "none";
+              (e.currentTarget as HTMLImageElement).style.display = "none";
             }}
           />
         </div>
 
+        {/* Title */}
         <div
           style={{
-            fontFamily: '"Inter", system-ui, sans-serif',
-            fontSize: "clamp(40px, 4.8vw, 68px)",
-            fontWeight: 900,
-            lineHeight: 0.98,
-            letterSpacing: "0.04em",
+            fontFamily: '"Cinzel", serif',
+            fontSize: "clamp(42px, 5.2vw, 74px)",
+            fontWeight: 700,
+            lineHeight: 0.96,
+            letterSpacing: "0.03em",
             textTransform: "uppercase",
-            color: "#f5c542",
-            textShadow:
-              "0 0 18px rgba(245,197,66,0.12), 0 6px 28px rgba(0,0,0,0.45)",
-            marginBottom: 18,
+            background: "linear-gradient(180deg, #f5e6b3 0%, #d4af37 48%, #8a6a12 100%)",
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+            textShadow: "0 4px 22px rgba(0,0,0,0.6)",
+            marginBottom: 14,
           }}
         >
           Die Mark
@@ -111,42 +110,48 @@ export default function WelcomeOverlay() {
           Digital
         </div>
 
+        {/* Subtitle */}
         <div
           style={{
-            fontSize: 15,
+            fontSize: "clamp(15px, 1.8vw, 17.5px)",
             fontWeight: 600,
-            letterSpacing: "0.02em",
-            color: "rgba(255,255,255,0.76)",
-            marginBottom: 10,
-            lineHeight: 1.55,
-            maxWidth: 460,
+            letterSpacing: "0.03em",
+            color: "rgba(255,255,255,0.82)",
+            maxWidth: 480,
+            lineHeight: 1.48,
+            marginBottom: 14,
           }}
         >
-          Willkommen auf der digitalen Handelsplattform für die nächste Generation
+          Willkommen auf der exklusiven digitalen Handelsplattform für die nächste Generation
           strategischer Marktteilnehmer.
         </div>
 
+        {/* Version Badge */}
         <div
           style={{
             fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: "0.14em",
+            fontWeight: 800,
+            letterSpacing: "0.16em",
             textTransform: "uppercase",
-            color: "rgba(245,197,66,0.72)",
-            marginBottom: 22,
+            color: "#f5c542",
+            background: "rgba(245,197,66,0.08)",
+            padding: "6px 22px",
+            borderRadius: 999,
+            border: "1px solid rgba(245,197,66,0.22)",
+            boxShadow: "0 0 16px rgba(245,197,66,0.15)",
+            marginBottom: 28,
           }}
         >
-          Investor Access · Version 3.5 Live
+          INVESTOR ACCESS • VERSION 3.5 LIVE
         </div>
 
+        {/* Gold Line */}
         <div
           style={{
-            width: 110,
+            width: 128,
             height: 2,
-            borderRadius: 999,
-            background:
-              "linear-gradient(90deg, rgba(245,197,66,0.05), rgba(245,197,66,0.72), rgba(245,197,66,0.05))",
-            boxShadow: "0 0 14px rgba(245,197,66,0.18)",
+            background: "linear-gradient(90deg, transparent, #f5c542, transparent)",
+            boxShadow: "0 0 18px rgba(245,197,66,0.35)",
           }}
         />
       </div>

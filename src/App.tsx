@@ -2,7 +2,6 @@
 // Investor_App_DMD — hardened active shell
 // Preserves the existing page structure and core UX,
 // but aligns runtime behavior with the current on-chain truth.
-
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ConnectionProvider,
@@ -49,7 +48,6 @@ import {
   TREASURY,
   DMD_MINT,
 } from "./solana";
-
 // UI Modules
 import Leaderboard from "./Leaderboard";
 import ForumView from "./ForumView";
@@ -59,7 +57,6 @@ import WelcomeOverlay from "./WelcomeOverlay";
 import PriceChart from "./PriceChart";
 import TxFeed from "./TxFeed";
 import "./index.css";
-
 // -------------------------
 // Types (wichtig für alle Status-Messages + Debug)
 // -------------------------
@@ -71,7 +68,6 @@ type ChartPoint = {
   dmdAppUsd: number;
   solUsd: number;
 };
-
 // -------------------------
 // Vite Env Typing
 // -------------------------
@@ -83,7 +79,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
-
 // -------------------------
 // Runtime constants (aligned to current contract)
 // -------------------------
@@ -95,7 +90,6 @@ const BUY_DAILY_LIMIT = 10;
 const SELL_WINDOW_SEC = 60 * 60 * 24 * 30;
 const FREE_SELLS_PER_WINDOW = 2;
 const DEX_PAIR = "6xBMvGzomHgPdWtD3V4JQ8rqji5EWtFDDoAyQhYsVVd2";
-
 // -------------------------
 // RPC (leak-safe)
 // -------------------------
@@ -110,7 +104,6 @@ function getRpcUrl(): string {
   }
   return rpc;
 }
-
 // -------------------------
 // Backend (optional / GH Pages safe)
 // -------------------------
@@ -131,7 +124,6 @@ async function fetchBackendJson(path: string): Promise<unknown> {
   }
   return r.json();
 }
-
 // -------------------------
 // Dexscreener
 // -------------------------
@@ -150,7 +142,6 @@ async function fetchDmdUsdFromDex(pairAddress: string): Promise<number> {
   const v = Number(p?.priceUsd ?? 0);
   return Number.isFinite(v) && v > 0 ? v : 0;
 }
-
 // -------------------------
 // Safe helpers
 // -------------------------
@@ -234,7 +225,6 @@ function normalizeErrorMessage(err: unknown): string {
   }
   return raw;
 }
-
 // -------------------------
 // Manual decoders (do not trust old App IDL for reads)
 // -------------------------
@@ -360,7 +350,6 @@ function decodeBuyerStateExtV2(
     firstClaimDone,
   };
 }
-
 // -------------------------
 // Shared UI helpers
 // -------------------------
@@ -463,7 +452,6 @@ function StatusPanel({
     </div>
   );
 }
-
 // =============================================================
 // Router (Tabs)
 // =============================================================
@@ -508,7 +496,6 @@ function NavBar(props: {
     </nav>
   );
 }
-
 // =============================================================
 // UI ROOT WRAPPER
 // =============================================================
@@ -572,9 +559,8 @@ function UIWrapper() {
     </>
   );
 }
-
 // =============================================================
-// DASHBOARD PAGE
+// DASHBOARD PAGE – FARBLICH FIXIERT (ELITE MATCH)
 // =============================================================
 function DashboardPage() {
   const wallet = useWallet();
@@ -700,50 +686,25 @@ function DashboardPage() {
   }, [connection]);
   return (
     <div style={{ marginTop: 20 }}>
-      <div className="grid-3">
-        <div className="card p-xl">
-          <div className="card-title">Vault (DMD)</div>
-          <div className="card-value">{vaultDmd.toLocaleString()}</div>
-        </div>
-        <div className="card p-xl">
-          <div className="card-title">Treasury (SOL)</div>
-          <div className="card-value">{treasurySol.toFixed(2)} SOL</div>
-        </div>
-        <div className="card p-xl">
-          <div className="card-title">Protocol Owner (DMD)</div>
-          <div className="card-value">{ownerDmd.toLocaleString()}</div>
-        </div>
-      </div>
-      <div style={{ marginTop: 18 }} className="grid-3">
-        <div className="card p-md">
-          <div className="card-title">DMD Price (DEX)</div>
-          <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : "—"}</div>
-        </div>
-        <div className="card p-md">
-          <div className="card-title">DMD App Value</div>
-          <div className="card-value">{dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}</div>
-        </div>
-        <div className="card p-md">
-          <div className="card-title">SOL Price (USD)</div>
-          <div className="card-value">{solUsd ? solUsd.toFixed(2) : "—"}</div>
-        </div>
-      </div>
-      <div className="grid-3" style={{ marginTop: 18 }}>
-        <div className="card p-md">
-          <div className="card-title">Vault Owner Match</div>
-          <div className="card-value">
+      {/* ELITE STATUS GRID – FARBLICH FIXIERT */}
+      <div className="grid-3" style={{ marginBottom: 24 }}>
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">VAULT OWNER MATCH</div>
+          <div style={{ fontSize: "28px", fontWeight: 700, color: vaultOwnerMatch ? "#7CFFB2" : "#ff4d4f", marginTop: 8 }}>
             {vaultOwnerMatch == null ? "—" : vaultOwnerMatch ? "YES" : "NO"}
           </div>
         </div>
-        <div className="card p-md">
-          <div className="card-title">Treasury Match</div>
-          <div className="card-value">
+
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">TREASURY MATCH</div>
+          <div style={{ fontSize: "28px", fontWeight: 700, color: treasuryMatch ? "#7CFFB2" : "#ff4d4f", marginTop: 8 }}>
             {treasuryMatch == null ? "—" : treasuryMatch ? "YES" : "NO"}
           </div>
         </div>
-        <div className="card p-md">
-          <div className="card-title">Sell Status</div>
-          <div className="card-value">
+
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">SELL STATUS</div>
+          <div style={{ marginTop: 8 }}>
             <StatusDot
               active={sellLive}
               label={
@@ -752,31 +713,44 @@ function DashboardPage() {
             />
           </div>
         </div>
-      </div>
-      <div className="grid-3" style={{ marginTop: 18 }}>
-        <div className="card p-md">
-          <div className="card-title">Pricing Mode</div>
-          <div className="card-value">
-            {dynamicPricingEnabled == null
-              ? "—"
-              : dynamicPricingEnabled
-              ? "Dynamic"
-              : "Manual"}
+
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">PRICING MODE</div>
+          <div style={{ fontSize: "24px", fontWeight: 700, color: "#f5c542", marginTop: 8 }}>
+            {dynamicPricingEnabled == null ? "—" : dynamicPricingEnabled ? "Dynamic" : "Manual"}
           </div>
         </div>
-        <div className="card p-md">
-          <div className="card-title">Program</div>
-          <div className="card-value" style={{ fontSize: 14 }}>
+
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">PROGRAM</div>
+          <div className="card-value" style={{ fontSize: 14, marginTop: 8 }}>
             {shortPk(PROGRAM_ID)}
           </div>
         </div>
-        <div className="card p-md">
-          <div className="card-title">Mint</div>
-          <div className="card-value" style={{ fontSize: 14 }}>
+
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">MINT</div>
+          <div className="card-value" style={{ fontSize: 14, marginTop: 8 }}>
             {shortPk(DMD_MINT)}
           </div>
         </div>
       </div>
+
+      <div style={{ marginTop: 18 }} className="grid-3">
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">DMD Price (DEX)</div>
+          <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : "—"}</div>
+        </div>
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">DMD App Value</div>
+          <div className="card-value">{dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}</div>
+        </div>
+        <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
+          <div className="card-title">SOL Price (USD)</div>
+          <div className="card-value">{solUsd ? solUsd.toFixed(2) : "—"}</div>
+        </div>
+      </div>
+
       <div style={{ marginTop: 40 }}>
         <TokenDistribution
           vault={vaultDmd}
@@ -811,7 +785,6 @@ function DashboardPage() {
     </div>
   );
 }
-
 // =============================================================
 // TRADING PAGE
 // =============================================================
@@ -838,11 +811,9 @@ function TradingPage() {
   const [sellLive, setSellLive] = useState<boolean>(false);
   const [walletDmd, setWalletDmd] = useState<number>(0);
   const [dmdMarketUsd, setDmdMarketUsd] = useState<number>(0);
-  const [walletInternalValueUsd, setWalletInternalValueUsd] =
-    useState<number>(0);
-  const [nowTs, setNowTs] = useState<number>(() =>
-    Math.floor(Date.now() / 1000)
-  );
+  const [walletInternalValueUsd, setWalletInternalValueUsd] = useState<number>(0);
+  const [nowTs, setNowTs] = useState<number>(() => Math.floor(Date.now() / 1000));
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   function setInfo(message: string) {
     setUiKind("info");
     setUiMessage(message);
@@ -854,6 +825,38 @@ function TradingPage() {
   function setError(message: string) {
     setUiKind("error");
     setUiMessage(message);
+  }
+  function currentDayIndexBerlin(ts: number): number {
+    const date = new Date(ts * 1000);
+    const berlinOffset = date.getTimezoneOffset() === -120 ? 2 : 1;
+    const berlinTime = new Date(date.getTime() + berlinOffset * 3600 * 1000);
+    return Math.floor(berlinTime.getTime() / 86400000);
+  }
+  function getBuyCountColor(count: number): string {
+    if (count === 0) return "#14f195";
+    if (count <= 4) return "#f5c542";
+    if (count <= 9) return "#6aa9ff";
+    return "#ff4d4f";
+  }
+  async function refreshBuyerState() {
+    if (!connected || !wallet.publicKey) return;
+    try {
+      const buyer = wallet.publicKey;
+      const vault = findVaultPda();
+      const bs = findBuyerStatePda(vault, buyer);
+      const buyerInfo = await connection.getAccountInfo(bs);
+      if (buyerInfo?.data) {
+        const decoded = decodeBuyerState(buyerInfo.data);
+        setBuyerState(decoded);
+        setWhitelisted(decoded.whitelisted);
+        console.log("[onchain-sync] Buy Count Today aktualisiert:", decoded.buyCountToday);
+      } else {
+        setBuyerState(null);
+        setWhitelisted(false);
+      }
+    } catch (e) {
+      console.error("Refresh BuyerState failed", e);
+    }
   }
   useEffect(() => {
     const iv = window.setInterval(
@@ -883,7 +886,7 @@ function TradingPage() {
     const lastClaim = Number(buyerState.lastRewardClaim);
     const lastBuyDay = Number(buyerState.lastBuyDay);
     const buyCountToday = Number(buyerState.buyCountToday);
-    const today = currentDayIndex(nowTs);
+    const today = currentDayIndexBerlin(nowTs);
     result.buyCountToday = lastBuyDay === today ? buyCountToday : 0;
     result.buyLimitReached = result.buyCountToday >= BUY_DAILY_LIMIT;
     result.dailyCountText = `${result.buyCountToday}/${BUY_DAILY_LIMIT}`;
@@ -1015,7 +1018,7 @@ function TradingPage() {
       alive = false;
       window.clearInterval(iv);
     };
-  }, [connection, connected, wallet.publicKey]);
+  }, [connection, connected, wallet.publicKey, refreshTrigger]);
   async function ensureAtas(
     buyer: PublicKey,
     vault: PublicKey
@@ -1120,6 +1123,7 @@ function TradingPage() {
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       const sig = await wallet.sendTransaction(tx, connection);
       setSuccess(`Buy gesendet: ${sig}`);
+      refreshBuyerState();
     } catch (e: unknown) {
       setError("Buy Fehler: " + normalizeErrorMessage(e));
     }
@@ -1147,7 +1151,7 @@ function TradingPage() {
         return;
       }
       if (!policyView.claimReady) {
-        setError(policyView.claimText || "Claim noch nicht verfügbar.");
+        setError(`Claim nicht verfügbar - ${policyView.claimText}`);
         return;
       }
       setInfo("Claim…");
@@ -1179,7 +1183,7 @@ function TradingPage() {
         return;
       }
       if (!sellLive) {
-        setError("Sell ist on-chain aktuell noch blockiert.");
+        setError("Kein Sell Möglich Fundament findungphase");
         return;
       }
       const rawDmd = Number(amountDmd.replace(",", "."));
@@ -1248,7 +1252,9 @@ function TradingPage() {
             </div>
             <div className="kv">
               <span>Buy Count Today</span>
-              <b>{policyView.dailyCountText}</b>
+              <b style={{ color: getBuyCountColor(policyView.buyCountToday) }}>
+                {policyView.dailyCountText}
+              </b>
             </div>
             <div className="kv">
               <span>Buy Cooldown</span>
@@ -1308,6 +1314,14 @@ function TradingPage() {
               Die Anzeige basiert konservativ auf On-chain BuyerState,
               BuyerStateExtV2 und VaultConfigV2. Maßgeblich bleibt die
               Blockchain.
+            </div>
+            <div className="small muted" style={{ marginTop: 6, lineHeight: 1.5 }}>
+              <span style={{ color: "#14f195" }}>● 0 Buys</span> •
+              <span style={{ color: "#f5c542" }}>● 1–4</span> •
+              <span style={{ color: "#6aa9ff" }}>● 5–9</span> •
+              <span style={{ color: "#ff4d4f" }}>● 10 = Tageslimit</span>
+              <br />
+              Reset täglich um <b>00:00 Berliner Zeit</b>
             </div>
           </div>
           <div className="panel" style={{ marginBottom: 20 }}>
@@ -1442,7 +1456,6 @@ function TradingPage() {
     </div>
   );
 }
-
 // =============================================================
 // FORUM PAGE
 // =============================================================
@@ -1479,7 +1492,6 @@ function ForumPage() {
     </div>
   );
 }
-
 // =============================================================
 // LEADERBOARD PAGE
 // =============================================================
@@ -1493,7 +1505,6 @@ function LeaderboardPage() {
     </div>
   );
 }
-
 // =============================================================
 // AIRDROP PAGE (Protocol Owner only)
 // =============================================================
@@ -1527,7 +1538,6 @@ function AirdropPage() {
     </div>
   );
 }
-
 // =============================================================
 // ROOT APP WRAPPER
 // =============================================================

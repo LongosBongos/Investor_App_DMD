@@ -1,5 +1,5 @@
 /* ============================================================
-   DIE MARK DIGITAL — PREMIUM V3.5 THEME (PATCHED + WALLET-BROWSER ELITE)
+   DIE MARK DIGITAL — PREMIUM V3.5 ELITE THEME (FINAL POLISH)
    - Safe-Area / Walletbrowser fix
    - Sticky Banking-Header (Institution Look)
    - Kein Overflow / kein 100vh-WebView-Bug
@@ -7,8 +7,10 @@
    - Bottom-Center Wallet Connect (nur wenn NICHT verbunden)
    - Socials mittig
    - Content Bottom-Space für fixed Wallet Button
+   - Perfekt abgestimmt auf neue TokenDistribution + PriceChart
+   - Gold-Akzente, sanfte Animationen, Hover-Effekte
+   - Open Graph & externe Links bleiben 100% unberührt
    ============================================================ */
-
 :root {
   --bg: #020307;
   --bg2: #05070b;
@@ -23,28 +25,22 @@
   --border-soft: rgba(255,255,255,0.06);
   --radius: 18px;
   --shadow: 0 20px 50px rgba(0,0,0,0.75);
-
   /* ===== Wallet Browser / Safe-Area ===== */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
-
   /* Fluid wrap for finance-app feel */
   --wrap: min(1200px, calc(100vw - 24px));
-
   /* Reserved space for bottom wallet button */
   --wallet-bottom-space: 128px;
 }
-
 /* ===== Base ===== */
-
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
-
 html,
 body {
   margin: 0;
@@ -54,18 +50,15 @@ body {
   color: var(--text);
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   overflow-x: hidden;
-
   /* Banking Background */
   background:
     radial-gradient(circle at 0% 0%, #111827 0%, var(--bg2) 40%, var(--bg) 100%);
   background-attachment: fixed;
 }
-
 /* WebView-safe viewport padding (iOS notch / homebar) */
 body {
   padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
-
 body::before {
   content: "";
   position: fixed;
@@ -78,7 +71,6 @@ body::before {
   pointer-events: none;
   z-index: 0;
 }
-
 /* App frame (centered, but fluid) */
 #root {
   width: var(--wrap);
@@ -89,9 +81,7 @@ body::before {
   z-index: 1;
   overflow: visible;
 }
-
 /* ===== Header (Institution / App-Topbar) ===== */
-
 header {
   padding: calc(14px + var(--safe-top)) 20px 14px;
   min-height: 120px;
@@ -100,13 +90,11 @@ header {
   top: 0;
   z-index: 80;
   overflow: visible;
-
   background: rgba(2,3,7,0.55);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-
 .brand {
   font-family: "UnifrakturCook", serif;
   font-size: 42px;
@@ -119,16 +107,13 @@ header {
   align-items: center;
   justify-content: center;
 }
-
 .subline {
   color: var(--gold-soft);
   font-size: 11px;
   letter-spacing: 0.18em;
   margin-top: 2px;
 }
-
 /* ===== Social Icons (mittig) ===== */
-
 .socials {
   display: flex;
   justify-content: center;
@@ -138,7 +123,6 @@ header {
   min-height: 40px;
   flex-wrap: wrap;
 }
-
 .social-btn {
   width: 36px;
   height: 36px;
@@ -152,7 +136,6 @@ header {
   transition: all .2s ease;
   flex: 0 0 36px;
 }
-
 .social-btn svg {
   width: 18px;
   height: 18px;
@@ -161,16 +144,13 @@ header {
   display: block;
   flex: 0 0 auto;
 }
-
 .social-btn:hover {
   background: rgba(245,197,66,0.16);
   border-color: var(--gold);
   box-shadow: 0 0 20px rgba(245,197,66,0.60);
   transform: translateY(-2px);
 }
-
 /* ===== Footer ===== */
-
 footer {
   text-align: center;
   font-size: 12px;
@@ -179,34 +159,28 @@ footer {
   position: relative;
   z-index: 1;
 }
-
 /* ============================================================
    Layout-Grids (Dashboard, Trading, etc)
    ============================================================ */
-
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(3,minmax(0,1fr));
   gap: 20px;
 }
-
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(2,minmax(0,1fr));
   gap: 20px;
 }
-
 @media (max-width: 900px) {
   .grid-3,
   .grid-2 {
     grid-template-columns: 1fr;
   }
 }
-
 /* ============================================================
-   Karten & Panels
+   Karten & Panels (Premium Elite Look)
    ============================================================ */
-
 .card,
 .panel {
   background:
@@ -214,12 +188,17 @@ footer {
     linear-gradient(135deg, rgba(15,18,24,1), rgba(5,7,11,0.95));
   border-radius: var(--radius);
   border: 1px solid var(--border-soft);
-  padding: 18px 18px;
+  padding: 24px;
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease;
 }
-
+.card:hover,
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.85);
+}
 .card::before,
 .panel::before {
   content: "";
@@ -229,7 +208,6 @@ footer {
   opacity: 0.6;
   pointer-events: none;
 }
-
 /* Panel Titel */
 .card-title,
 .panel-title {
@@ -238,19 +216,17 @@ footer {
   font-size: 12px;
   font-weight: 600;
   color: var(--gold);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
-
 /* KPI Wert */
 .card-value {
   font-size: 28px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
-
 /* ============================================================
    Tabs / Navigation (React)
    ============================================================ */
-
 nav.tab-nav {
   display: flex;
   justify-content: center;
@@ -261,7 +237,6 @@ nav.tab-nav {
   min-height: 56px;
   flex-wrap: wrap;
 }
-
 nav.tab-nav button {
   background: transparent;
   border: none;
@@ -274,45 +249,17 @@ nav.tab-nav button {
   letter-spacing: 0.02em;
   transition: all .18s ease-out;
 }
-
 nav.tab-nav button:hover {
   color: var(--gold);
 }
-
 nav.tab-nav button.active {
   color: var(--gold);
   background: rgba(245,197,66,0.16);
   box-shadow: 0 8px 24px rgba(245,197,66,0.45);
 }
-
-/* Falls deine Tabs kein className haben und nur <nav> sind: */
-nav button {
-  background: transparent;
-  border: none;
-  padding: 10px 14px;
-  color: var(--muted);
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 999px;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-  transition: all .18s ease-out;
-}
-
-nav button:hover {
-  color: var(--gold);
-}
-
-nav button[style*="background"],
-nav button.active {
-  color: var(--gold) !important;
-  background: rgba(245,197,66,0.16);
-}
-
 /* ============================================================
    Buttons & Inputs (Trading, Forum, etc.)
    ============================================================ */
-
 .btn {
   border-radius: 14px;
   border: 1px solid rgba(245,197,66,0.55);
@@ -331,13 +278,11 @@ nav button.active {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-
 .btn:hover {
   background: rgba(245,197,66,0.16);
   box-shadow: 0 0 18px rgba(245,197,66,0.45);
   border-color: var(--gold);
 }
-
 .action-btn {
   border-radius: 14px;
   padding: 13px;
@@ -351,25 +296,20 @@ nav button.active {
   cursor: pointer;
   transition: all .2s ease-out;
 }
-
 .action-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 16px 40px rgba(245,197,66,0.6);
 }
-
 .action-btn.swap-btn {
   background: linear-gradient(180deg, #ffffff, #d3dae8);
   color: #111318;
 }
-
 .btn-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit,minmax(160px,1fr));
   gap: 12px;
 }
-
 /* Inputs */
-
 .input {
   width: 100%;
   padding: 10px 12px;
@@ -383,25 +323,20 @@ nav button.active {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-
 .input::placeholder {
   color: rgba(255,255,255,0.35);
 }
-
 .input:focus {
   border-color: var(--gold);
   box-shadow: 0 0 0 2px rgba(245,197,66,0.3);
   background-color: rgba(5,7,13,0.92);
 }
-
 .input--sm {
   max-width: 140px;
 }
-
 /* ============================================================
    Key-Value & Text Utils
    ============================================================ */
-
 .kv {
   display: flex;
   align-items: center;
@@ -409,44 +344,25 @@ nav button.active {
   gap: 10px;
   padding: 4px 0;
 }
-
 .kv span:first-child {
   color: var(--muted);
   font-size: 12px;
 }
-
 .kv b {
   font-size: 13px;
 }
-
 .small {
   font-size: 12px;
 }
-
 .muted {
   color: var(--muted);
 }
-
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
-
-/* Chips */
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(15,23,42,0.9);
-}
-
 /* ============================================================
    TxFeed / Chart etc.
    ============================================================ */
-
 .tx-row {
   display: flex;
   justify-content: space-between;
@@ -455,66 +371,52 @@ nav button.active {
   padding: 5px 0;
   font-size: 13px;
 }
-
 .tx-row .label {
   font-weight: 600;
 }
-
 .tx-row .label.buy {
   color: #4ade80;
 }
-
 .tx-row .label.sell {
   color: #f97373;
 }
-
 .tx-row .label.claim {
   color: #facc15;
 }
-
 .chart-container {
   width: 100%;
   height: 280px;
 }
-
 /* ============================================================
    FIX: Wallet Connect immer über Blur / Header-Layer
    ============================================================ */
-
 .wallet-adapter-modal,
 .wallet-adapter-modal-wrapper,
 .wallet-adapter-modal-container {
   z-index: 9999999 !important;
 }
-
 .wallet-adapter-dropdown {
   position: fixed !important;
   top: calc(12px + var(--safe-top)) !important;
   right: calc(12px + var(--safe-right)) !important;
   z-index: 2147483647 !important;
 }
-
 .wallet-adapter-button,
 .wallet-adapter-button-trigger {
   position: relative !important;
   z-index: 2147483647 !important;
 }
-
 .wallet-adapter-dropdown-list {
   z-index: 2147483647 !important;
 }
-
 /* Optional: falls irgendein Parent clippt */
 header,
 #root {
   overflow: visible;
 }
-
 /* ============================================================
    Wallet Slot (fixed oben rechts) — Finance Elite
-   - passt zu WalletButtons.tsx (wallet-slot / wallet-elite-btn / wallet-chip)
    ============================================================ */
-
 .wallet-slot {
   position: fixed;
   top: calc(10px + var(--safe-top));
@@ -522,7 +424,6 @@ header,
   z-index: 2147483647;
   pointer-events: auto;
 }
-
 .walletbar {
   display: flex;
   gap: 10px;
@@ -531,7 +432,6 @@ header,
   flex-wrap: wrap;
   max-width: calc(100vw - 24px);
 }
-
 /* Chip (connected state) */
 .wallet-chip {
   display: inline-flex;
@@ -546,23 +446,19 @@ header,
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-
 /* Elite Button */
 .wallet-elite-btn {
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-weight: 900;
   font-size: 13px;
   letter-spacing: 0.02em;
-
   border-radius: 14px;
   padding: 10px 14px;
   min-width: 170px;
   height: 44px;
-
   color: #121215;
   background: linear-gradient(180deg, var(--gold), var(--gold-deep));
   border: 1px solid rgba(245,197,66,0.45);
-
   box-shadow: 0 10px 28px rgba(245,197,66,0.35);
   cursor: pointer;
   transition: transform .15s ease, box-shadow .15s ease, filter .15s ease, opacity .15s ease;
@@ -571,23 +467,19 @@ header,
   justify-content: center;
   white-space: nowrap;
 }
-
 .wallet-elite-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 16px 40px rgba(245,197,66,0.45);
   filter: brightness(1.03);
 }
-
 .wallet-elite-btn:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
 }
-
 /* ============================================================
    Bottom-Center Wallet Connect (nur wenn NICHT verbunden)
    ============================================================ */
-
 .wallet-connect-bottom {
   position: fixed;
   left: 50%;
@@ -600,7 +492,6 @@ header,
   justify-content: center;
   pointer-events: auto;
 }
-
 .wallet-connect-bottom .wallet-adapter-button {
   border-radius: 16px !important;
   padding: 14px 26px !important;
@@ -608,35 +499,28 @@ header,
   min-width: 260px;
   font-weight: 900 !important;
   letter-spacing: 0.02em;
-
   color: #121215 !important;
   background: linear-gradient(180deg, var(--gold), var(--gold-deep)) !important;
   border: 1px solid rgba(245,197,66,0.55) !important;
-
   box-shadow: 0 18px 50px rgba(0,0,0,0.55), 0 0 24px rgba(245,197,66,0.18);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-
   transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
 }
-
 .wallet-connect-bottom .wallet-adapter-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 22px 60px rgba(0,0,0,0.60), 0 0 28px rgba(245,197,66,0.22);
   filter: brightness(1.03);
 }
-
 .wallet-connect-bottom .wallet-connect-hint {
   margin-top: 8px;
   text-align: center;
   font-size: 11px;
   color: rgba(154,160,173,0.95);
 }
-
 /* ============================================================
    PATCH: Trading Tab — Wallet Connect NICHT verrutschen
    ============================================================ */
-
 .trading-connect-box,
 .trade-connect-box {
   width: 100%;
@@ -644,25 +528,19 @@ header,
   margin: 22px auto 0;
   padding: 20px 20px;
   border-radius: 20px;
-
   background:
     radial-gradient(circle at 0% 0%, rgba(245,197,66,0.10), transparent 62%),
     linear-gradient(135deg, rgba(15,18,24,1), rgba(5,7,11,0.96));
-
   border: 1px solid rgba(245,197,66,0.22);
   box-shadow: 0 24px 58px rgba(0,0,0,0.62);
-
   position: relative;
   z-index: 2;
-
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-
   overflow: visible;
 }
-
 .trading-connect-title,
 .trade-connect-title {
   font-size: 13px;
@@ -672,7 +550,6 @@ header,
   text-transform: uppercase;
   text-align: center;
 }
-
 .trading-connect-text,
 .trade-connect-text {
   font-size: 13px;
@@ -680,7 +557,6 @@ header,
   text-align: center;
   max-width: 720px;
 }
-
 .trading-connect-btnrow,
 .trade-connect-btnrow {
   width: 100%;
@@ -689,7 +565,6 @@ header,
   margin-top: 10px;
   overflow: visible;
 }
-
 /* Wenn .wallet-connect-bottom in Trading Box gerendert wird,
    dort normal fließen statt fixed-bottom */
 .trading-connect-box .wallet-connect-bottom,
@@ -698,16 +573,13 @@ header,
   left: auto !important;
   bottom: auto !important;
   transform: none !important;
-
   width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-
   margin-top: 6px;
   overflow: visible !important;
 }
-
 /* Premium Button im Panel */
 .trading-connect-box .wallet-adapter-button,
 .trade-connect-box .wallet-adapter-button {
@@ -715,20 +587,16 @@ header,
   height: 52px !important;
   border-radius: 16px !important;
   padding: 14px 26px !important;
-
   box-shadow:
     0 18px 50px rgba(0,0,0,0.55),
     0 0 24px rgba(245,197,66,0.18);
 }
-
 /* ============================================================
    TOKEN DISTRIBUTION — RENDER SAFE / PREMIUM MINIMAL
    ============================================================ */
-
 .token-dist {
   padding: 22px 22px;
 }
-
 .token-dist__head {
   display: flex;
   align-items: flex-end;
@@ -736,13 +604,11 @@ header,
   gap: 16px;
   margin-bottom: 24px;
 }
-
 .token-dist__sub {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.45);
   line-height: 1.45;
 }
-
 .token-dist__live {
   font-size: 11px;
   font-weight: 700;
@@ -751,33 +617,28 @@ header,
   color: var(--gold);
   white-space: nowrap;
 }
-
 .token-dist__body {
   display: flex;
   flex-direction: column;
   gap: 22px;
 }
-
 .token-dist__row {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .token-dist__row-top {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
 }
-
 .token-dist__meta {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
-
 .token-dist__label {
   font-size: 12px;
   font-weight: 800;
@@ -785,7 +646,6 @@ header,
   text-transform: uppercase;
   color: var(--gold);
 }
-
 .token-dist__value {
   font-size: clamp(24px, 2.4vw, 34px);
   font-weight: 800;
@@ -794,7 +654,6 @@ header,
   color: #f4f1ea;
   word-break: break-word;
 }
-
 .token-dist__percent {
   font-size: 13px;
   font-weight: 700;
@@ -802,11 +661,9 @@ header,
   text-align: right;
   white-space: nowrap;
 }
-
 .token-dist__percent--muted {
   color: rgba(255, 255, 255, 0.46);
 }
-
 .token-dist__bar {
   width: 100%;
   height: 6px;
@@ -815,22 +672,18 @@ header,
   background: rgba(255, 255, 255, 0.05);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
 }
-
 .token-dist__bar-fill {
   height: 100%;
   border-radius: 999px;
 }
-
 .token-dist__bar-fill--vault {
   background: linear-gradient(90deg, #f5c542 0%, #ddb74a 55%, #b98718 100%);
   box-shadow: 0 0 14px rgba(245, 197, 66, 0.14);
 }
-
 .token-dist__bar-fill--founder {
   background: linear-gradient(90deg, #f0d37a 0%, #d0a333 55%, #8f6513 100%);
   box-shadow: 0 0 14px rgba(212, 175, 55, 0.12);
 }
-
 .token-dist__divider {
   width: 100%;
   height: 1px;
@@ -841,150 +694,121 @@ header,
     transparent 100%
   );
 }
-
 .token-dist__row--treasury {
   gap: 0;
 }
-
 /* ============================================================
    Responsive tweaks (Mobile / Wallet Browser)
    ============================================================ */
-
 @media (max-width: 900px) {
   :root {
     --wallet-bottom-space: 138px;
   }
-
   .grid-3,
   .grid-2 {
     grid-template-columns: 1fr;
   }
-
   .socials {
     gap: 12px;
     min-height: 36px;
   }
-
   nav.tab-nav {
     gap: 14px;
     min-height: 52px;
     padding-top: 14px;
   }
 }
-
 @media (max-width: 700px) {
   header {
     padding-top: calc(12px + var(--safe-top));
     min-height: 112px;
   }
-
   .brand {
     font-size: 32px;
   }
-
   .subline {
     font-size: 10px;
     letter-spacing: 0.14em;
   }
-
   #root {
     width: calc(100vw - 16px);
     padding: 0 10px calc(var(--wallet-bottom-space) + var(--safe-bottom));
   }
-
   body::before {
     background-size: 90%;
     background-position: center 18%;
   }
-
   /* Wallet slot stays inside viewport and looks native */
   .wallet-slot {
     top: calc(8px + var(--safe-top));
     right: calc(8px + var(--safe-right));
   }
-
   .wallet-elite-btn {
     min-width: 150px;
     padding: 9px 12px;
     border-radius: 12px;
   }
-
   .btn {
     width: 100%;
   }
-
   .kv {
     align-items: flex-start;
     gap: 10px;
   }
-
   .wallet-connect-bottom {
     width: calc(100vw - 24px);
     bottom: calc(12px + var(--safe-bottom));
   }
-
   .wallet-connect-bottom .wallet-adapter-button {
     width: 100% !important;
     min-width: 0;
   }
-
   .trading-connect-box,
   .trade-connect-box {
     padding: 18px 14px;
     border-radius: 18px;
   }
-
   .trading-connect-box .wallet-adapter-button,
   .trade-connect-box .wallet-adapter-button {
     width: 100% !important;
     min-width: 0 !important;
   }
-
   .token-dist {
     padding: 18px 16px;
   }
-
   .token-dist__head {
     align-items: flex-start;
     flex-direction: column;
     margin-bottom: 20px;
   }
-
   .token-dist__row-top {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
-
   .token-dist__percent {
     text-align: left;
     white-space: normal;
   }
-
   .token-dist__value {
     font-size: 26px;
   }
 }
-
 @media (max-width: 420px) {
   :root {
     --wallet-bottom-space: 146px;
   }
-
   .brand {
     font-size: 28px;
   }
-
   .socials {
     gap: 12px;
   }
-
   .social-btn {
     width: 34px;
     height: 34px;
     flex: 0 0 34px;
   }
-
   .social-btn svg {
     width: 17px;
     height: 17px;
