@@ -2,6 +2,7 @@
 // Investor_App_DMD — hardened active shell
 // Preserves the existing page structure and core UX,
 // but aligns runtime behavior with the current on-chain truth.
+
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ConnectionProvider,
@@ -142,6 +143,7 @@ type DexPairResponse = {
     priceNative?: string;
   }>;
 };
+
 async function fetchDmdUsdFromDex(pairAddress: string): Promise<number> {
   const url = `https://api.dexscreener.com/latest/dex/pairs/solana/${pairAddress}?_=${Date.now()}`;
   const r = await fetch(url, { cache: "no-store" });
@@ -198,41 +200,30 @@ function slippageToBps(s: string): number {
   if (!Number.isFinite(n) || n <= 0) return 100;
   return Math.floor(n * 100);
 }
-function normalizeErrorMessage(err: unknown): string {
+function tr(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ""));
+}
+function normalizeErrorMessage(err: unknown, t: TText): string {
   const raw = err instanceof Error ? err.message : String(err);
-  if (raw.includes("SELL_DISABLED_FRONTEND")) {
-    return "Sell / DMD→SOL ist aktuell bewusst deaktiviert.";
-  }
-  if (raw.includes("BuyCooldownActive")) {
-    return "Buy-Cooldown aktiv. Bitte warte, bis der Cooldown abgelaufen ist.";
-  }
-  if (raw.includes("BuyDailyLimitExceeded")) {
-    return "Tageslimit erreicht. Weitere Buys sind vorübergehend gesperrt.";
-  }
-  if (raw.includes("LegacyClaimFlowDisabled")) {
-    return "Nur Claim V2 ist aktiv. Bitte App-Stand prüfen.";
-  }
-  if (raw.includes("SellTemporarilyDisabled")) {
-    return "Sell ist on-chain derzeit deaktiviert.";
-  }
-  if (raw.includes("InvalidTreasury")) {
-    return "Treasury-Konfiguration stimmt nicht mit der On-chain-Wahrheit überein.";
-  }
-  if (raw.includes("InvalidOwner")) {
-    return "Owner-Konfiguration stimmt nicht mit der On-chain-Wahrheit überein.";
-  }
-  if (raw.includes("RewardTooSmall")) {
-    return "Reward aktuell zu klein für einen Claim.";
-  }
+
+  if (raw.includes("SELL_DISABLED_FRONTEND")) return t.sellDisabledFrontend;
+  if (raw.includes("BuyCooldownActive")) return t.buyCooldownActive;
+  if (raw.includes("BuyDailyLimitExceeded")) return t.buyDailyLimitExceeded;
+  if (raw.includes("LegacyClaimFlowDisabled")) return t.legacyClaimFlowDisabled;
+  if (raw.includes("SellTemporarilyDisabled")) return t.sellTemporarilyDisabled;
+  if (raw.includes("InvalidTreasury")) return t.invalidTreasury;
+  if (raw.includes("InvalidOwner")) return t.invalidOwner;
+  if (raw.includes("RewardTooSmall")) return t.rewardTooSmall;
   if (raw.includes("InsufficientVaultRewardLiquidity")) {
-    return "Nicht genug Reward-Liquidität im Vault.";
+    return t.insufficientVaultRewardLiquidity;
   }
   if (raw.includes("InsufficientTreasuryLiquidity")) {
-    return "Die Treasury hat aktuell nicht genug Liquidität für diesen Pfad.";
+    return t.insufficientTreasuryLiquidity;
   }
   if (raw.includes("ExtraSellApprovalRequired")) {
-    return "Zusätzliche Sell-Freigabe erforderlich.";
+    return t.extraSellApprovalRequired;
   }
+
   return raw;
 }
 
@@ -416,11 +407,14 @@ function StatusDot({
 function StatusPanel({
   kind,
   message,
+  t,
 }: {
   kind: UiKind;
   message: string;
+  t: TText;
 }) {
   if (!message) return null;
+
   const border =
     kind === "error"
       ? "rgba(255,77,79,0.5)"
@@ -439,6 +433,7 @@ function StatusPanel({
       : kind === "success"
       ? "#8dffd3"
       : "#f5c542";
+
   return (
     <div
       className="panel"
@@ -459,10 +454,10 @@ function StatusPanel({
         }}
       >
         {kind === "error"
-          ? "ERROR"
+          ? t.errorLabel
           : kind === "success"
-          ? "STATUS OK"
-          : "HINWEIS"}
+          ? t.statusOkLabel
+          : t.hintLabel}
       </div>
       <div className="small" style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
         {message}
@@ -825,7 +820,7 @@ function DashboardPage({ t }: { t: TText }) {
               marginTop: 8,
             }}
           >
-            {vaultOwnerMatch == null ? "—" : vaultOwnerMatch ? "YES" : "NO"}
+            {vaultOwnerMatch == null ? t.unavailable : vaultOwnerMatch ? t.yes : t.no}
           </div>
         </div>
 
@@ -839,7 +834,7 @@ function DashboardPage({ t }: { t: TText }) {
               marginTop: 8,
             }}
           >
-            {treasuryMatch == null ? "—" : treasuryMatch ? "YES" : "NO"}
+            {treasuryMatch == null ? t.unavailable : treasuryMatch ? t.yes : t.no}
           </div>
         </div>
 
@@ -866,7 +861,7 @@ function DashboardPage({ t }: { t: TText }) {
             }}
           >
             {dynamicPricingEnabled == null
-              ? "—"
+              ? t.unavailable
               : dynamicPricingEnabled
               ? t.dynamic
               : t.manual}
@@ -891,17 +886,17 @@ function DashboardPage({ t }: { t: TText }) {
       <div style={{ marginTop: 18 }} className="grid-3">
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
           <div className="card-title">{t.dmdPriceDex}</div>
-          <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : "—"}</div>
+          <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : t.unavailable}</div>
         </div>
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
           <div className="card-title">{t.dmdAppValue}</div>
           <div className="card-value">
-            {dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}
+            {dmdAppUsd ? dmdAppUsd.toFixed(6) : t.unavailable}
           </div>
         </div>
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
           <div className="card-title">{t.solPriceUsd}</div>
-          <div className="card-value">{solUsd ? solUsd.toFixed(2) : "—"}</div>
+          <div className="card-value">{solUsd ? solUsd.toFixed(2) : t.unavailable}</div>
         </div>
       </div>
 
@@ -918,8 +913,8 @@ function DashboardPage({ t }: { t: TText }) {
       </div>
 
       <div className="grid-3" style={{ marginTop: 40 }}>
-        <TxFeed title="Public Feed" rows={pubFeed} />
-        <TxFeed title="Treasury Feed" rows={treFeed} />
+        <TxFeed title={t.publicFeed} rows={pubFeed} />
+        <TxFeed title={t.treasuryFeed} rows={treFeed} />
         {isOwner ? (
           <div className="panel" style={{ padding: 20 }}>
             <div className="panel-title">{t.protocolNotice}</div>
@@ -1046,13 +1041,13 @@ function TradingPage({ t }: { t: TText }) {
       holdReadyAt: 0,
       intervalReadyAt: 0,
       claimReady: false,
-      claimText: "—",
-      dailyCountText: "—",
+      claimText: t.unavailable,
+      dailyCountText: t.unavailable,
       sellCountWindow: 0,
       freeSellsLeft: FREE_SELLS_PER_WINDOW,
       extraSellApprovals: 0,
       sellWindowTimeLeft: 0,
-      sellWindowText: "—",
+      sellWindowText: t.unavailable,
     };
 
     if (!buyerState) return result;
@@ -1088,7 +1083,7 @@ function TradingPage({ t }: { t: TText }) {
         result.sellWindowText =
           result.sellWindowTimeLeft > 0
             ? fmtCountdown(result.sellWindowTimeLeft)
-            : "Reset fällig / nächstes Fenster aktiv";
+            : t.sellWindowResetPending;
       }
     }
 
@@ -1111,15 +1106,15 @@ function TradingPage({ t }: { t: TText }) {
       const left = readyAt - nowTs;
       result.claimReady = left <= 0;
       result.claimText = result.claimReady
-        ? "✅ Claim verfügbar"
-        : `⏳ Claim in ${fmtCountdown(left)}`;
+        ? t.claimAvailableNow
+        : tr(t.claimAvailableIn, { time: fmtCountdown(left) });
     } else {
       result.claimReady = false;
-      result.claimText = "—";
+      result.claimText = t.unavailable;
     }
 
     return result;
-  }, [buyerState, buyerExt, nowTs]);
+  }, [buyerState, buyerExt, nowTs, t]);
 
   useEffect(() => {
     let alive = true;
@@ -1264,70 +1259,66 @@ function TradingPage({ t }: { t: TText }) {
   async function handleAutoWhitelist() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert(t.walletConnect);
+        alert(t.walletConnectAlert);
         return;
       }
 
       const rawSol = Number(amountSol.replace(",", "."));
       if (!Number.isFinite(rawSol) || rawSol < BUY_MIN_SOL) {
         setError(
-          `Auto-Whitelist erfordert mindestens ${BUY_MIN_SOL.toFixed(
-            1
-          )} SOL Kaufabsicht.`
+          tr(t.autoWhitelistRequiresMinBuy, {
+            min: BUY_MIN_SOL.toFixed(1),
+          })
         );
         return;
       }
 
-      setInfo("Auto-Whitelist…");
+      setInfo(t.autoWhitelistInProgress);
       const ix = ixAutoWhitelistSelf(ixCoder, wallet.publicKey);
       const tx = new Transaction().add(ix);
       tx.feePayer = wallet.publicKey;
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setSuccess(`Whitelist gesendet: ${sig}`);
+      setSuccess(`${t.whitelistSent} ${sig}`);
       setRefreshTrigger((x) => x + 1);
       void refreshBuyerState();
     } catch (e: unknown) {
-      setError("Whitelist Fehler: " + normalizeErrorMessage(e));
+      setError(t.whitelistErrorPrefix + normalizeErrorMessage(e, t));
     }
   }
 
   async function handleInitBuyerExtV2() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert(t.walletConnect);
+        alert(t.walletConnectAlert);
         return;
       }
 
-      setInfo("Initialisiere BuyerStateExtV2…");
+      setInfo(t.v2InitInProgress);
       const ix = ixInitializeBuyerStateExtV2(ixCoder, wallet.publicKey);
       const tx = new Transaction().add(ix);
       tx.feePayer = wallet.publicKey;
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setSuccess(
-        `V2-Status initialisiert: ${sig}. Bitte danach Claim / Trading erneut nutzen.`
-      );
+      setSuccess(`${t.v2StatusInitialized} ${sig}. ${t.v2StatusInitializedSuffix}`);
       setRefreshTrigger((x) => x + 1);
       void refreshBuyerState();
     } catch (e: unknown) {
-      setError("V2 Init Fehler: " + normalizeErrorMessage(e));
+      setError(t.v2InitErrorPrefix + normalizeErrorMessage(e, t));
     }
   }
 
   async function handleBuy() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert(t.walletConnect);
+        alert(t.walletConnectAlert);
         return;
       }
 
       if (isLegacyWallet) {
-        setError(
-          "Legacy-Wallet erkannt. Bitte zuerst BuyerStateExtV2 initialisieren."
-        );
+        setError(t.legacyWalletInitFirst);
         return;
       }
 
@@ -1337,23 +1328,26 @@ function TradingPage({ t }: { t: TText }) {
         rawSol < BUY_MIN_SOL ||
         rawSol > BUY_MAX_SOL
       ) {
-        setError(`Buy-Bereich: ${BUY_MIN_SOL} bis ${BUY_MAX_SOL} SOL.`);
-        return;
-      }
-
-      if (!whitelisted) {
-        setError("Wallet ist nicht freigeschaltet.");
-        return;
-      }
-
-      if (policyView.buyCooldownLeft > 0) {
         setError(
-          `Buy-Cooldown aktiv: ${fmtCountdown(policyView.buyCooldownLeft)}`
+          tr(t.buyRangeError, {
+            min: BUY_MIN_SOL,
+            max: BUY_MAX_SOL,
+          })
         );
         return;
       }
 
-      setInfo("Buy…");
+      if (!whitelisted) {
+        setError(t.walletNotApproved);
+        return;
+      }
+
+      if (policyView.buyCooldownLeft > 0) {
+        setError(`${t.buyCooldownActive} ${fmtCountdown(policyView.buyCooldownLeft)}`);
+        return;
+      }
+
+      setInfo(t.buyInProgress);
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
       const ixs = await ensureAtas(buyer, vault);
@@ -1367,35 +1361,35 @@ function TradingPage({ t }: { t: TText }) {
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setSuccess(`Buy gesendet: ${sig}`);
+      setSuccess(`${t.buySent} ${sig}`);
       setRefreshTrigger((x) => x + 1);
       void refreshBuyerState();
     } catch (e: unknown) {
-      setError("Buy Fehler: " + normalizeErrorMessage(e));
+      setError(t.buyErrorPrefix + normalizeErrorMessage(e, t));
     }
   }
 
   async function handleClaim() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert(t.walletConnect);
+        alert(t.walletConnectAlert);
         return;
       }
 
       if (!buyerState) {
-        setError("Kein BuyerState vorhanden.");
+        setError(t.noBuyerState);
         return;
       }
 
       if (!buyerExt || isLegacyWallet) {
-        setInfo("Legacy-Wallet erkannt. Initialisiere zuerst BuyerStateExtV2…");
+        setInfo(t.legacyWalletClaimInitFirst);
         const initIx = ixInitializeBuyerStateExtV2(ixCoder, wallet.publicKey);
         const initTx = new Transaction().add(initIx);
         initTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
         initTx.feePayer = wallet.publicKey;
         const initSig = await wallet.sendTransaction(initTx, connection);
         setSuccess(
-          `V2-Status initialisiert: ${initSig}. Bitte Claim jetzt erneut drücken.`
+          `${t.v2StatusInitialized} ${initSig}. ${t.v2StatusInitializedClaimRetry}`
         );
         setRefreshTrigger((x) => x + 1);
         void refreshBuyerState();
@@ -1403,11 +1397,11 @@ function TradingPage({ t }: { t: TText }) {
       }
 
       if (!policyView.claimReady) {
-        setError(`Claim nicht verfügbar - ${policyView.claimText}`);
+        setError(t.claimUnavailablePrefix + policyView.claimText);
         return;
       }
 
-      setInfo("Claim…");
+      setInfo(t.claimInProgress);
       const buyer = wallet.publicKey;
       const vault = findVaultPda();
       const ixs = await ensureAtas(buyer, vault);
@@ -1420,47 +1414,43 @@ function TradingPage({ t }: { t: TText }) {
       tx.feePayer = buyer;
 
       const sig = await wallet.sendTransaction(tx, connection);
-      setSuccess(`Claim gesendet: ${sig}`);
+      setSuccess(`${t.claimSent} ${sig}`);
       setRefreshTrigger((x) => x + 1);
       void refreshBuyerState();
     } catch (e: unknown) {
-      setError("Claim Fehler: " + normalizeErrorMessage(e));
+      setError(t.claimErrorPrefix + normalizeErrorMessage(e, t));
     }
   }
 
   async function handleSellClick() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert(t.walletConnect);
+        alert(t.walletConnectAlert);
         return;
       }
 
       if (isLegacyWallet) {
-        setError(
-          "Legacy-Wallet erkannt. Bitte zuerst BuyerStateExtV2 initialisieren."
-        );
+        setError(t.legacyWalletInitFirst);
         return;
       }
 
       if (!sellLive) {
-        setError("Kein Sell Möglich Fundament findungphase");
+        setError(t.sellFoundationPhaseBlocked);
         return;
       }
 
       const rawDmd = Number(amountDmd.replace(",", "."));
       if (!Number.isFinite(rawDmd) || rawDmd <= 0) {
-        setError("Bitte eine gültige DMD-Menge eingeben.");
+        setError(t.invalidDmdAmount);
         return;
       }
 
       void ixSwapExactDmdForSol;
       void slippageToBps(slippagePct);
 
-      setInfo(
-        "Sell ist on-chain freigegeben. Der Public-Investor-Client führt den DMD→SOL-Pfad aktuell bewusst nicht selbst aus, weil die bestehende On-chain-Sell-Route treasury-seitig signergebunden ist. Die App zeigt dir den echten Sell-Status, aber täuscht keinen öffentlichen Sell-Flow vor."
-      );
+      setInfo(t.sellPublicClientNotice);
     } catch (e: unknown) {
-      setError("Sell Hinweis: " + normalizeErrorMessage(e));
+      setError(t.sellHintPrefix + normalizeErrorMessage(e, t));
     }
   }
 
@@ -1494,20 +1484,20 @@ function TradingPage({ t }: { t: TText }) {
                 >
                   {walletInternalValueUsd > 0
                     ? fmtUsd(walletInternalValueUsd)
-                    : "—"}
+                    : t.unavailable}
                 </span>
               </div>
             </div>
 
             <div className="kv">
               <span>{t.dmdMarketDex}</span>
-              <b>{dmdMarketUsd > 0 ? `$${dmdMarketUsd.toFixed(6)}` : "—"}</b>
+              <b>{dmdMarketUsd > 0 ? `$${dmdMarketUsd.toFixed(6)}` : t.unavailable}</b>
             </div>
 
             <div className="kv">
               <span>{t.yourDmdDexValue}</span>
               <b>
-                {dmdMarketUsd > 0 ? fmtUsd(walletDmd * dmdMarketUsd) : "—"}
+                {dmdMarketUsd > 0 ? fmtUsd(walletDmd * dmdMarketUsd) : t.unavailable}
               </b>
             </div>
 
@@ -1536,22 +1526,22 @@ function TradingPage({ t }: { t: TText }) {
 
             <div className="kv">
               <span>{t.sellCountWindow}</span>
-              <b>{buyerExt ? buyerExt.sellCountWindow : "—"}</b>
+              <b>{buyerExt ? buyerExt.sellCountWindow : t.unavailable}</b>
             </div>
 
             <div className="kv">
               <span>{t.freeSellsInWindow}</span>
-              <b>{buyerExt ? policyView.freeSellsLeft : "—"}</b>
+              <b>{buyerExt ? policyView.freeSellsLeft : t.unavailable}</b>
             </div>
 
             <div className="kv">
               <span>{t.extraSellApprovals}</span>
-              <b>{buyerExt ? buyerExt.extraSellApprovals : "—"}</b>
+              <b>{buyerExt ? buyerExt.extraSellApprovals : t.unavailable}</b>
             </div>
 
             <div className="kv">
               <span>{t.sellWindowReset}</span>
-              <b>{buyerExt ? policyView.sellWindowText : "—"}</b>
+              <b>{buyerExt ? policyView.sellWindowText : t.unavailable}</b>
             </div>
 
             <div className="kv">
@@ -1561,7 +1551,7 @@ function TradingPage({ t }: { t: TText }) {
 
             <div className="kv">
               <span>{t.vaultDmd}</span>
-              <b>{vaultDmd != null ? vaultDmd.toLocaleString() : "—"}</b>
+              <b>{vaultDmd != null ? vaultDmd.toLocaleString() : t.unavailable}</b>
             </div>
 
             <div className="kv">
@@ -1593,10 +1583,10 @@ function TradingPage({ t }: { t: TText }) {
             </div>
 
             <div className="small muted" style={{ marginTop: 6, lineHeight: 1.5 }}>
-              <span style={{ color: "#14f195" }}>● 0 Buys</span> •
-              <span style={{ color: "#f5c542" }}>● 1–4</span> •
-              <span style={{ color: "#6aa9ff" }}>● 5–9</span> •
-              <span style={{ color: "#ff4d4f" }}>● 10 = {t.dailyLimit}</span>
+              <span style={{ color: "#14f195" }}>● {t.buyCountLegendZero}</span> •
+              <span style={{ color: "#f5c542" }}>● {t.buyCountLegendLow}</span> •
+              <span style={{ color: "#6aa9ff" }}>● {t.buyCountLegendMid}</span> •
+              <span style={{ color: "#ff4d4f" }}>● {t.buyCountLegendLimit}</span>
               <br />
               {t.resetUtc}
             </div>
@@ -1713,9 +1703,7 @@ function TradingPage({ t }: { t: TText }) {
                   <button
                     className="action-btn swap-btn"
                     disabled={!sellLive}
-                    title={
-                      sellLive ? t.sellStatusLive : t.sellCurrentlyBlocked
-                    }
+                    title={sellLive ? t.sellAvailableTitle : t.sellDisabledTitle}
                     onClick={handleSellClick}
                   >
                     {sellLive ? t.sellStatusLive : t.sellCurrentlyBlocked}
@@ -1726,7 +1714,9 @@ function TradingPage({ t }: { t: TText }) {
                     onClick={handleClaim}
                     disabled={!policyView.claimReady}
                     title={
-                      !policyView.claimReady ? "Noch nicht verfügbar" : "Claim verfügbar"
+                      !policyView.claimReady
+                        ? t.claimNotAvailableTitle
+                        : t.claimAvailableTitle
                     }
                   >
                     {t.claim}
@@ -1736,7 +1726,7 @@ function TradingPage({ t }: { t: TText }) {
             </div>
           )}
 
-          <StatusPanel kind={uiKind} message={uiMessage} />
+          <StatusPanel kind={uiKind} message={uiMessage} t={t} />
         </>
       )}
     </div>
