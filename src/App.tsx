@@ -48,6 +48,8 @@ import {
   TREASURY,
   DMD_MINT,
 } from "./solana";
+import { translations, type Lang } from "./translations";
+
 // UI Modules
 import Leaderboard from "./Leaderboard";
 import ForumView from "./ForumView";
@@ -59,7 +61,7 @@ import TxFeed from "./TxFeed";
 import "./index.css";
 
 // -------------------------
-// Types (wichtig für alle Status-Messages + Debug)
+// Types
 // -------------------------
 type Tab = "Dashboard" | "Trading" | "Forum" | "Leaderboard" | "Airdrop";
 type UiKind = "idle" | "info" | "success" | "error";
@@ -69,6 +71,7 @@ type ChartPoint = {
   dmdAppUsd: number;
   solUsd: number;
 };
+type TText = (typeof translations)["de"];
 
 // -------------------------
 // Vite Env Typing
@@ -83,7 +86,7 @@ interface ImportMeta {
 }
 
 // -------------------------
-// Runtime constants (aligned to current contract)
+// Runtime constants
 // -------------------------
 const HOLD_DURATION_SEC = 60 * 60 * 24 * 30;
 const CLAIM_INTERVAL_SEC = 60 * 60 * 24 * 90;
@@ -110,7 +113,7 @@ function getRpcUrl(): string {
 }
 
 // -------------------------
-// Backend (optional / GH Pages safe)
+// Backend
 // -------------------------
 function backendEnabled(): boolean {
   return (import.meta.env.VITE_BACKEND_ENABLED || "").trim() === "1";
@@ -234,7 +237,7 @@ function normalizeErrorMessage(err: unknown): string {
 }
 
 // -------------------------
-// Manual decoders (do not trust old App IDL for reads)
+// Manual decoders
 // -------------------------
 type VaultDecoded = {
   owner: PublicKey;
@@ -468,6 +471,62 @@ function StatusPanel({
   );
 }
 
+function LanguageToggle({
+  lang,
+  setLang,
+}: {
+  lang: Lang;
+  setLang: (lang: Lang) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        marginTop: 10,
+        marginBottom: 4,
+      }}
+    >
+      <div
+        style={{
+          display: "inline-flex",
+          border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 12,
+          overflow: "hidden",
+          background: "rgba(255,255,255,0.03)",
+        }}
+      >
+        <button
+          className="btn"
+          onClick={() => setLang("de")}
+          style={{
+            borderRadius: 0,
+            border: "none",
+            background: lang === "de" ? "rgba(245,197,66,0.14)" : "transparent",
+            color: lang === "de" ? "var(--gold)" : "white",
+            boxShadow: "none",
+          }}
+        >
+          DE
+        </button>
+        <button
+          className="btn"
+          onClick={() => setLang("en")}
+          style={{
+            borderRadius: 0,
+            border: "none",
+            background: lang === "en" ? "rgba(245,197,66,0.14)" : "transparent",
+            color: lang === "en" ? "var(--gold)" : "white",
+            boxShadow: "none",
+          }}
+        >
+          EN
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // =============================================================
 // Router (Tabs)
 // =============================================================
@@ -475,10 +534,20 @@ function NavBar(props: {
   active: Tab;
   setActive: (t: Tab) => void;
   showAirdrop: boolean;
+  t: TText;
 }) {
   const items: Tab[] = props.showAirdrop
     ? ["Dashboard", "Trading", "Forum", "Leaderboard", "Airdrop"]
     : ["Dashboard", "Trading", "Forum", "Leaderboard"];
+
+  const labelMap: Record<Tab, string> = {
+    Dashboard: props.t.dashboard,
+    Trading: props.t.trading,
+    Forum: props.t.forum,
+    Leaderboard: props.t.leaderboard,
+    Airdrop: props.t.airdrop,
+  };
+
   return (
     <nav
       className="tab-nav"
@@ -486,27 +555,27 @@ function NavBar(props: {
         display: "flex",
         gap: 20,
         justifyContent: "center",
-        marginTop: 30,
+        marginTop: 20,
         marginBottom: 30,
         flexWrap: "wrap",
       }}
     >
-      {items.map((t) => (
+      {items.map((tab) => (
         <button
-          key={t}
-          onClick={() => props.setActive(t)}
-          className={props.active === t ? "active" : ""}
+          key={tab}
+          onClick={() => props.setActive(tab)}
+          className={props.active === tab ? "active" : ""}
           style={{
             padding: "10px 18px",
             borderRadius: 12,
             border: "1px solid rgba(255,255,255,0.1)",
             background:
-              props.active === t ? "rgba(245,197,66,0.12)" : "transparent",
-            color: props.active === t ? "var(--gold)" : "white",
+              props.active === tab ? "rgba(245,197,66,0.12)" : "transparent",
+            color: props.active === tab ? "var(--gold)" : "white",
             fontWeight: 600,
           }}
         >
-          {t}
+          {labelMap[tab]}
         </button>
       ))}
     </nav>
@@ -518,16 +587,30 @@ function NavBar(props: {
 // =============================================================
 function UIWrapper() {
   const [page, setPage] = useState<Tab>("Dashboard");
+  const [lang, setLang] = useState<Lang>("de");
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
   const isOwner =
     connected && wallet.publicKey?.toBase58() === PROTOCOL_OWNER.toBase58();
 
   useEffect(() => {
+    const saved = localStorage.getItem("dmd_lang");
+    if (saved === "de" || saved === "en") {
+      setLang(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("dmd_lang", lang);
+  }, [lang]);
+
+  useEffect(() => {
     if (page === "Airdrop" && !isOwner) {
       setPage("Dashboard");
     }
   }, [page, isOwner]);
+
+  const t = translations[lang];
 
   return (
     <>
@@ -569,23 +652,24 @@ function UIWrapper() {
         </div>
       )}
 
-      <NavBar active={page} setActive={setPage} showAirdrop={isOwner} />
+      <LanguageToggle lang={lang} setLang={setLang} />
+      <NavBar active={page} setActive={setPage} showAirdrop={isOwner} t={t} />
 
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        {page === "Dashboard" && <DashboardPage />}
-        {page === "Trading" && <TradingPage />}
-        {page === "Forum" && <ForumPage />}
-        {page === "Leaderboard" && <LeaderboardPage />}
-        {page === "Airdrop" && isOwner && <AirdropPage />}
+        {page === "Dashboard" && <DashboardPage t={t} />}
+        {page === "Trading" && <TradingPage t={t} />}
+        {page === "Forum" && <ForumPage t={t} />}
+        {page === "Leaderboard" && <LeaderboardPage t={t} />}
+        {page === "Airdrop" && isOwner && <AirdropPage t={t} />}
       </div>
     </>
   );
 }
 
 // =============================================================
-// DASHBOARD PAGE – FARBLICH FIXIERT (ELITE MATCH)
+// DASHBOARD PAGE
 // =============================================================
-function DashboardPage() {
+function DashboardPage({ t }: { t: TText }) {
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
   const isOwner =
@@ -732,7 +816,7 @@ function DashboardPage() {
     <div style={{ marginTop: 20 }}>
       <div className="grid-3" style={{ marginBottom: 24 }}>
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">VAULT OWNER MATCH</div>
+          <div className="card-title">{t.vaultOwnerMatch}</div>
           <div
             style={{
               fontSize: "28px",
@@ -746,7 +830,7 @@ function DashboardPage() {
         </div>
 
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">TREASURY MATCH</div>
+          <div className="card-title">{t.treasuryMatch}</div>
           <div
             style={{
               fontSize: "28px",
@@ -760,19 +844,19 @@ function DashboardPage() {
         </div>
 
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">SELL STATUS</div>
+          <div className="card-title">{t.sellStatus}</div>
           <div style={{ marginTop: 8 }}>
             <StatusDot
               active={sellLive}
               label={
-                sellLive == null ? "UNKNOWN" : sellLive ? "LIVE" : "BLOCKED"
+                sellLive == null ? t.unknown : sellLive ? t.live : t.blocked
               }
             />
           </div>
         </div>
 
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">PRICING MODE</div>
+          <div className="card-title">{t.pricingMode}</div>
           <div
             style={{
               fontSize: "24px",
@@ -784,20 +868,20 @@ function DashboardPage() {
             {dynamicPricingEnabled == null
               ? "—"
               : dynamicPricingEnabled
-              ? "Dynamic"
-              : "Manual"}
+              ? t.dynamic
+              : t.manual}
           </div>
         </div>
 
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">PROGRAM</div>
+          <div className="card-title">{t.program}</div>
           <div className="card-value" style={{ fontSize: 14, marginTop: 8 }}>
             {shortPk(PROGRAM_ID)}
           </div>
         </div>
 
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">MINT</div>
+          <div className="card-title">{t.mint}</div>
           <div className="card-value" style={{ fontSize: 14, marginTop: 8 }}>
             {shortPk(DMD_MINT)}
           </div>
@@ -806,17 +890,17 @@ function DashboardPage() {
 
       <div style={{ marginTop: 18 }} className="grid-3">
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">DMD Price (DEX)</div>
+          <div className="card-title">{t.dmdPriceDex}</div>
           <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : "—"}</div>
         </div>
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">DMD App Value</div>
+          <div className="card-title">{t.dmdAppValue}</div>
           <div className="card-value">
             {dmdAppUsd ? dmdAppUsd.toFixed(6) : "—"}
           </div>
         </div>
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
-          <div className="card-title">SOL Price (USD)</div>
+          <div className="card-title">{t.solPriceUsd}</div>
           <div className="card-value">{solUsd ? solUsd.toFixed(2) : "—"}</div>
         </div>
       </div>
@@ -838,18 +922,16 @@ function DashboardPage() {
         <TxFeed title="Treasury Feed" rows={treFeed} />
         {isOwner ? (
           <div className="panel" style={{ padding: 20 }}>
-            <div className="panel-title">Protocol Notice</div>
+            <div className="panel-title">{t.protocolNotice}</div>
             <p className="small muted" style={{ lineHeight: 1.6 }}>
-              Founder-/Owner-spezifische Feeds sind absichtlich nicht Teil des
-              öffentlichen Investor-Flows.
+              {t.founderOwnerFeedsHidden}
             </p>
           </div>
         ) : (
           <div className="panel" style={{ padding: 20 }}>
-            <div className="panel-title">Status</div>
+            <div className="panel-title">{t.status}</div>
             <p className="small muted" style={{ lineHeight: 1.6 }}>
-              On-chain state is the source of truth. The app shows a
-              conservative public surface.
+              {t.onchainSourceNotice}
             </p>
           </div>
         )}
@@ -861,7 +943,7 @@ function DashboardPage() {
 // =============================================================
 // TRADING PAGE
 // =============================================================
-function TradingPage() {
+function TradingPage({ t }: { t: TText }) {
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
 
@@ -1016,13 +1098,13 @@ function TradingPage() {
     const firstClaimDone = Boolean(buyerExt?.firstClaimDone);
     let readyAt = 0;
 
-    // Phase 1: vor dem ersten Claim -> nur 30 Tage Hold
     if (!firstClaimDone) {
       readyAt = result.holdReadyAt;
-    }
-    // Phase 2: nach dem ersten Claim -> nur 90 Tage Intervall
-    else {
-      readyAt = result.intervalReadyAt > 0 ? result.intervalReadyAt : result.holdReadyAt;
+    } else {
+      readyAt =
+        result.intervalReadyAt > 0
+          ? result.intervalReadyAt
+          : result.holdReadyAt;
     }
 
     if (readyAt > 0) {
@@ -1182,7 +1264,7 @@ function TradingPage() {
   async function handleAutoWhitelist() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert("Wallet verbinden.");
+        alert(t.walletConnect);
         return;
       }
 
@@ -1214,7 +1296,7 @@ function TradingPage() {
   async function handleInitBuyerExtV2() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert("Wallet verbinden.");
+        alert(t.walletConnect);
         return;
       }
 
@@ -1238,7 +1320,7 @@ function TradingPage() {
   async function handleBuy() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert("Wallet verbinden.");
+        alert(t.walletConnect);
         return;
       }
 
@@ -1296,7 +1378,7 @@ function TradingPage() {
   async function handleClaim() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert("Wallet verbinden.");
+        alert(t.walletConnect);
         return;
       }
 
@@ -1349,7 +1431,7 @@ function TradingPage() {
   async function handleSellClick() {
     try {
       if (!connected || !wallet.publicKey) {
-        alert("Wallet verbinden.");
+        alert(t.walletConnect);
         return;
       }
 
@@ -1386,21 +1468,18 @@ function TradingPage() {
     <div style={{ marginTop: 20 }}>
       {!connected && (
         <div className="panel" style={{ textAlign: "center", padding: 20 }}>
-          <div className="panel-title">Wallet verbinden</div>
-          <p className="small muted">
-            Verbinde deine Wallet über den Button unten, um DMD sicher zu
-            nutzen.
-          </p>
+          <div className="panel-title">{t.walletConnect}</div>
+          <p className="small muted">{t.walletConnectHint}</p>
         </div>
       )}
 
       {connected && (
         <>
           <div className="panel" style={{ marginBottom: 20 }}>
-            <div className="panel-title">Wallet Overview</div>
+            <div className="panel-title">{t.walletOverview}</div>
 
             <div className="kv" style={{ alignItems: "flex-start" }}>
-              <span>Dein DMD</span>
+              <span>{t.yourDmd}</span>
               <div style={{ textAlign: "right" }}>
                 <b style={{ display: "block" }}>{walletDmd.toLocaleString()}</b>
                 <span
@@ -1421,76 +1500,76 @@ function TradingPage() {
             </div>
 
             <div className="kv">
-              <span>DMD Market (DEX)</span>
+              <span>{t.dmdMarketDex}</span>
               <b>{dmdMarketUsd > 0 ? `$${dmdMarketUsd.toFixed(6)}` : "—"}</b>
             </div>
 
             <div className="kv">
-              <span>Wert deiner DMD (DEX)</span>
+              <span>{t.yourDmdDexValue}</span>
               <b>
                 {dmdMarketUsd > 0 ? fmtUsd(walletDmd * dmdMarketUsd) : "—"}
               </b>
             </div>
 
             <div className="kv">
-              <span>Claim Counter</span>
+              <span>{t.claimCounter}</span>
               <b style={{ color: policyView.claimReady ? "#14f195" : undefined }}>
                 {policyView.claimText}
               </b>
             </div>
 
             <div className="kv">
-              <span>Buy Count Today</span>
+              <span>{t.buyCountToday}</span>
               <b style={{ color: getBuyCountColor(policyView.buyCountToday) }}>
                 {policyView.dailyCountText}
               </b>
             </div>
 
             <div className="kv">
-              <span>Buy Cooldown</span>
+              <span>{t.buyCooldown}</span>
               <b>
                 {policyView.buyCooldownLeft > 0
                   ? fmtCountdown(policyView.buyCooldownLeft)
-                  : "frei"}
+                  : t.free}
               </b>
             </div>
 
             <div className="kv">
-              <span>Sell Count Window</span>
+              <span>{t.sellCountWindow}</span>
               <b>{buyerExt ? buyerExt.sellCountWindow : "—"}</b>
             </div>
 
             <div className="kv">
-              <span>Freie Sells im Fenster</span>
+              <span>{t.freeSellsInWindow}</span>
               <b>{buyerExt ? policyView.freeSellsLeft : "—"}</b>
             </div>
 
             <div className="kv">
-              <span>Extra Sell Approvals</span>
+              <span>{t.extraSellApprovals}</span>
               <b>{buyerExt ? buyerExt.extraSellApprovals : "—"}</b>
             </div>
 
             <div className="kv">
-              <span>Sell Window Reset</span>
+              <span>{t.sellWindowReset}</span>
               <b>{buyerExt ? policyView.sellWindowText : "—"}</b>
             </div>
 
             <div className="kv">
-              <span>Treasury (SOL)</span>
+              <span>{t.treasurySol}</span>
               <b>{treasurySol.toFixed(2)}</b>
             </div>
 
             <div className="kv">
-              <span>Vault (DMD)</span>
+              <span>{t.vaultDmd}</span>
               <b>{vaultDmd != null ? vaultDmd.toLocaleString() : "—"}</b>
             </div>
 
             <div className="kv">
-              <span>Sell Route</span>
+              <span>{t.sellRoute}</span>
               <b>
                 <StatusDot
                   active={sellLive}
-                  label={sellLive ? "ON-CHAIN LIVE" : "ON-CHAIN BLOCKED"}
+                  label={sellLive ? t.onchainLive : t.onchainBlocked}
                 />
               </b>
             </div>
@@ -1505,61 +1584,51 @@ function TradingPage() {
                   fontWeight: 600,
                 }}
               >
-                Legacy-Wallet erkannt: BuyerState vorhanden, BuyerStateExtV2
-                fehlt noch.
+                {t.legacyWalletDetected}
               </div>
             )}
 
             <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
-              Die Anzeige basiert konservativ auf On-chain BuyerState,
-              BuyerStateExtV2 und VaultConfigV2. Maßgeblich bleibt die
-              Blockchain.
+              {t.conservativeDisplayNotice}
             </div>
 
             <div className="small muted" style={{ marginTop: 6, lineHeight: 1.5 }}>
               <span style={{ color: "#14f195" }}>● 0 Buys</span> •
               <span style={{ color: "#f5c542" }}>● 1–4</span> •
               <span style={{ color: "#6aa9ff" }}>● 5–9</span> •
-              <span style={{ color: "#ff4d4f" }}>● 10 = Tageslimit</span>
+              <span style={{ color: "#ff4d4f" }}>● 10 = {t.dailyLimit}</span>
               <br />
-              Reset täglich um <b>00:00 UTC</b>
+              {t.resetUtc}
             </div>
           </div>
 
           <div className="panel" style={{ marginBottom: 20 }}>
-            <div className="panel-title">Trading Hinweis</div>
+            <div className="panel-title">{t.tradingNotice}</div>
             <div className="small" style={{ lineHeight: 1.6 }}>
-              <b>
-                {sellLive
-                  ? "Sell / DMD→SOL ist on-chain freigegeben."
-                  : "Sell / DMD→SOL ist on-chain aktuell blockiert."}
-              </b>
+              <b>{sellLive ? t.sellOnchainLive : t.sellOnchainBlocked}</b>
               <br />
-              Die Investor App richtet sich nach dem echten On-chain-Status aus.
-              Buy und Claim bleiben der sichere Standardpfad.
+              {t.investorClientNotice}
             </div>
           </div>
 
           {!whitelisted && (
             <div className="panel" style={{ marginBottom: 20 }}>
-              <div className="panel-title">Whitelist</div>
-              <p className="small muted">Du bist noch nicht freigeschaltet.</p>
+              <div className="panel-title">{t.whitelist}</div>
+              <p className="small muted">{t.notApprovedYet}</p>
               <button className="btn" onClick={handleAutoWhitelist}>
-                Auto-Whitelist
+                {t.autoWhitelist}
               </button>
             </div>
           )}
 
           {whitelisted && isLegacyWallet && (
             <div className="panel" style={{ marginBottom: 20 }}>
-              <div className="panel-title">V2 Aktivierung</div>
+              <div className="panel-title">{t.v2Activation}</div>
               <p className="small muted" style={{ lineHeight: 1.6 }}>
-                Deine Wallet stammt noch aus dem Legacy-Stand. Für den finalen
-                V2-Pfad muss einmal BuyerStateExtV2 angelegt werden. Danach
-                läuft die App nur noch über die echte gehärtete On-chain-Logik.
+                {t.legacyWalletNotice}
               </p>
               <button className="btn" onClick={handleInitBuyerExtV2}>
-                V2 STATUS INITIALISIEREN
+                {t.initV2Status}
               </button>
             </div>
           )}
@@ -1567,7 +1636,7 @@ function TradingPage() {
           {whitelisted && !isLegacyWallet && (
             <div className="grid-2">
               <div className="panel">
-                <div className="panel-title">SOL → DMD</div>
+                <div className="panel-title">{t.solToDmd}</div>
 
                 <label className="small muted">SOL</label>
                 <input
@@ -1577,7 +1646,7 @@ function TradingPage() {
                 />
 
                 <label className="small muted" style={{ marginTop: 10 }}>
-                  Slippage (%)
+                  {t.slippagePct}
                 </label>
                 <input
                   className="input input--sm"
@@ -1586,21 +1655,20 @@ function TradingPage() {
                 />
 
                 <div className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
-                  Buy Bereich: {BUY_MIN_SOL} bis {BUY_MAX_SOL} SOL.
+                  {t.buyRange}: {BUY_MIN_SOL} bis {BUY_MAX_SOL} SOL.
                   <br />
-                  Tageslimit: {BUY_DAILY_LIMIT} Buys. Danach kann ein Cooldown
-                  greifen.
+                  {t.dailyLimit}: {BUY_DAILY_LIMIT} {t.buys}. {t.cooldownMayApply}
                 </div>
 
                 <div className="btn-grid" style={{ marginTop: 15 }}>
                   <button className="action-btn" onClick={handleBuy}>
-                    BUY DMD
+                    {t.buyDmd}
                   </button>
                 </div>
               </div>
 
               <div className="panel">
-                <div className="panel-title">DMD → SOL</div>
+                <div className="panel-title">{t.dmdToSol}</div>
 
                 <label className="small muted">DMD</label>
                 <input
@@ -1610,7 +1678,7 @@ function TradingPage() {
                 />
 
                 <label className="small muted" style={{ marginTop: 10 }}>
-                  Slippage (%)
+                  {t.slippagePct}
                 </label>
                 <input
                   className="input input--sm"
@@ -1623,21 +1691,21 @@ function TradingPage() {
                     active={sellLive}
                     label={
                       sellLive
-                        ? "Sell ist on-chain freigegeben."
-                        : "Sell bleibt on-chain aktuell blockiert."
+                        ? t.sellOnchainEnabled
+                        : t.sellOnchainStillBlocked
                     }
                   />
                   <br />
                   <span style={{ display: "inline-block", marginTop: 8 }}>
-                    Freie Sells im Fenster: {policyView.freeSellsLeft}
+                    {t.freeSellsInWindow}: {policyView.freeSellsLeft}
                   </span>
                   <br />
                   <span style={{ display: "inline-block", marginTop: 4 }}>
-                    Extra-Freigaben: {policyView.extraSellApprovals}
+                    {t.extraSellApprovals}: {policyView.extraSellApprovals}
                   </span>
                   <br />
                   <span style={{ display: "inline-block", marginTop: 8 }}>
-                    Claim bleibt verfügbar, sobald die Bedingungen erfüllt sind.
+                    {t.claimRemainsAvailable}
                   </span>
                 </div>
 
@@ -1646,11 +1714,11 @@ function TradingPage() {
                     className="action-btn swap-btn"
                     disabled={!sellLive}
                     title={
-                      sellLive ? "Sell verfügbar" : "Sell on-chain noch deaktiviert"
+                      sellLive ? t.sellStatusLive : t.sellCurrentlyBlocked
                     }
                     onClick={handleSellClick}
                   >
-                    DMD SELL ZU SOL BLOCKED
+                    {sellLive ? t.sellStatusLive : t.sellCurrentlyBlocked}
                   </button>
 
                   <button
@@ -1658,12 +1726,10 @@ function TradingPage() {
                     onClick={handleClaim}
                     disabled={!policyView.claimReady}
                     title={
-                      !policyView.claimReady
-                        ? "Noch nicht verfügbar"
-                        : "Claim verfügbar"
+                      !policyView.claimReady ? "Noch nicht verfügbar" : "Claim verfügbar"
                     }
                   >
-                    CLAIM
+                    {t.claim}
                   </button>
                 </div>
               </div>
@@ -1680,7 +1746,7 @@ function TradingPage() {
 // =============================================================
 // FORUM PAGE
 // =============================================================
-function ForumPage() {
+function ForumPage({ t }: { t: TText }) {
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
   const backendOn = backendEnabled();
@@ -1688,22 +1754,19 @@ function ForumPage() {
   return (
     <div style={{ marginTop: 20 }}>
       <div className="panel-title" style={{ color: "var(--gold)", marginBottom: 20 }}>
-        Community Forum
+        {t.communityForum}
       </div>
 
       {!connected && (
         <div className="panel" style={{ padding: 20 }}>
-          <p className="small muted">Bitte Wallet verbinden (Button unten).</p>
+          <p className="small muted">{t.walletConnect}</p>
         </div>
       )}
 
       {connected && !backendOn && (
         <div className="panel" style={{ padding: 20 }}>
-          <p className="small muted" style={{ lineHeight: 1.6 }}>
-            Das Forum ist ohne Backend absichtlich im Schreibmodus deaktiviert.
-            <br />
-            Grund: Kein lokaler LocalStorage-Fallback im produktiven
-            Investor-Flow.
+          <p className="small muted" style={{ lineHeight: 1.6, whiteSpace: "pre-line" }}>
+            {t.forumBackendDisabled}
           </p>
         </div>
       )}
@@ -1721,11 +1784,11 @@ function ForumPage() {
 // =============================================================
 // LEADERBOARD PAGE
 // =============================================================
-function LeaderboardPage() {
+function LeaderboardPage({ t }: { t: TText }) {
   return (
     <div style={{ marginTop: 20 }}>
       <div className="panel-title" style={{ color: "var(--gold)", marginBottom: 20 }}>
-        Top DMD Holder
+        {t.topDmdHolder}
       </div>
       <Leaderboard />
     </div>
@@ -1733,9 +1796,9 @@ function LeaderboardPage() {
 }
 
 // =============================================================
-// AIRDROP PAGE (Protocol Owner only)
+// AIRDROP PAGE
 // =============================================================
-function AirdropPage() {
+function AirdropPage({ t }: { t: TText }) {
   const wallet = useWallet();
   const connected = Boolean(wallet.publicKey);
   const isOwner =
@@ -1744,20 +1807,18 @@ function AirdropPage() {
   return (
     <div style={{ marginTop: 20 }}>
       <div className="panel-title" style={{ color: "var(--gold)", marginBottom: 20 }}>
-        Protocol Owner – Smart Airdrop Preview
+        {t.protocolOwnerAirdrop}
       </div>
 
       {!connected && (
         <div className="panel" style={{ padding: 20 }}>
-          <p className="small muted">Bitte Wallet verbinden (Button unten).</p>
+          <p className="small muted">{t.walletConnect}</p>
         </div>
       )}
 
       {connected && !isOwner && (
         <div className="panel" style={{ padding: 20 }}>
-          <p className="small muted">
-            Nur der aktuelle Protocol Owner kann diesen Bereich sehen.
-          </p>
+          <p className="small muted">{t.ownerOnlyArea}</p>
         </div>
       )}
 
