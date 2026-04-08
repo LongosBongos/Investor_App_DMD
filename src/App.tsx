@@ -1090,27 +1090,32 @@ function TradingPage({ t }: { t: TText }) {
     result.holdReadyAt = holdSince > 0 ? holdSince + HOLD_DURATION_SEC : 0;
     result.intervalReadyAt = lastClaim > 0 ? lastClaim + CLAIM_INTERVAL_SEC : 0;
 
-    const firstClaimDone = Boolean(buyerExt?.firstClaimDone);
-    let readyAt = 0;
+    // Öffentliche lib.rs-Wahrheit:
+    // Claim ist nur verfügbar, wenn die 30-Tage-Hold-Prüfung erfüllt ist
+    // UND falls lastRewardClaim > 0 zusätzlich auch die 90 Tage seit letztem Claim.
+    const holdReady = result.holdReadyAt > 0 && nowTs >= result.holdReadyAt;
+    const intervalReady =
+      lastClaim === 0 || (result.intervalReadyAt > 0 && nowTs >= result.intervalReadyAt);
 
-    if (!firstClaimDone) {
-      readyAt = result.holdReadyAt;
-    } else {
-      readyAt =
-        result.intervalReadyAt > 0
-          ? result.intervalReadyAt
-          : result.holdReadyAt;
-    }
+    result.claimReady = holdReady && intervalReady;
 
-    if (readyAt > 0) {
-      const left = readyAt - nowTs;
-      result.claimReady = left <= 0;
-      result.claimText = result.claimReady
-        ? t.claimAvailableNow
-        : tr(t.claimAvailableIn, { time: fmtCountdown(left) });
+    if (result.claimReady) {
+      result.claimText = t.claimAvailableNow;
     } else {
-      result.claimReady = false;
-      result.claimText = t.unavailable;
+      const targets: number[] = [];
+      if (result.holdReadyAt > 0 && !holdReady) targets.push(result.holdReadyAt);
+      if (lastClaim > 0 && result.intervalReadyAt > 0 && !intervalReady) {
+        targets.push(result.intervalReadyAt);
+      }
+
+      if (targets.length > 0) {
+        const nextReady = Math.max(...targets);
+        result.claimText = tr(t.claimAvailableIn, {
+          time: fmtCountdown(Math.max(0, nextReady - nowTs)),
+        });
+      } else {
+        result.claimText = t.unavailable;
+      }
     }
 
     return result;
@@ -1393,6 +1398,37 @@ function TradingPage({ t }: { t: TText }) {
         );
         setRefreshTrigger((x) => x + 1);
         void refreshBuyerState();
+        return;
+      }
+
+      // Öffentliche lib.rs-Wahrheit:
+      // 1) holding_since muss mindestens 30 Tage alt sein
+      // 2) wenn last_reward_claim > 0, müssen zusätzlich 90 Tage seit letztem Claim vergangen sein
+      const holdSince = Number(buyerState.holdingSince);
+      const lastClaim = Number(buyerState.lastRewardClaim);
+
+      const holdReadyAt = holdSince > 0 ? holdSince + HOLD_DURATION_SEC : 0;
+      const intervalReadyAt = lastClaim > 0 ? lastClaim + CLAIM_INTERVAL_SEC : 0;
+
+      const holdReady = holdReadyAt > 0 && nowTs >= holdReadyAt;
+      const intervalReady = lastClaim === 0 || (intervalReadyAt > 0 && nowTs >= intervalReadyAt);
+
+      if (!(holdReady && intervalReady)) {
+        const targets: number[] = [];
+        if (holdReadyAt > 0 && !holdReady) targets.push(holdReadyAt);
+        if (lastClaim > 0 && intervalReadyAt > 0 && !intervalReady) {
+          targets.push(intervalReadyAt);
+        }
+
+        if (targets.length > 0) {
+          const nextReady = Math.max(...targets);
+          setError(
+            t.claimUnavailablePrefix +
+              tr(t.claimAvailableIn, { time: fmtCountdown(Math.max(0, nextReady - nowTs)) })
+          );
+        } else {
+          setError(t.claimUnavailablePrefix + t.unavailable);
+        }
         return;
       }
 
