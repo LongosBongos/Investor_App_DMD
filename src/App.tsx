@@ -886,7 +886,9 @@ function DashboardPage({ t }: { t: TText }) {
       <div style={{ marginTop: 18 }} className="grid-3">
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
           <div className="card-title">{t.dmdPriceDex}</div>
-          <div className="card-value">{dmdUsd ? dmdUsd.toFixed(6) : t.unavailable}</div>
+          <div className="card-value">
+            {dmdUsd ? dmdUsd.toFixed(6) : "Controlled Treasury Phase"}
+          </div>
         </div>
         <div className="card panel" style={{ textAlign: "center", padding: "20px" }}>
           <div className="card-title">{t.dmdAppValue}</div>
@@ -1527,13 +1529,19 @@ function TradingPage({ t }: { t: TText }) {
 
             <div className="kv">
               <span>{t.dmdMarketDex}</span>
-              <b>{dmdMarketUsd > 0 ? `$${dmdMarketUsd.toFixed(6)}` : t.unavailable}</b>
+              <b>
+                {dmdMarketUsd > 0
+                  ? `$${dmdMarketUsd.toFixed(6)}`
+                  : "Controlled Treasury Phase"}
+              </b>
             </div>
 
             <div className="kv">
               <span>{t.yourDmdDexValue}</span>
               <b>
-                {dmdMarketUsd > 0 ? fmtUsd(walletDmd * dmdMarketUsd) : t.unavailable}
+                {walletInternalValueUsd > 0
+                  ? fmtUsd(walletInternalValueUsd)
+                  : t.unavailable}
               </b>
             </div>
 

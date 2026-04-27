@@ -28,7 +28,7 @@ export default function TokenDistribution({ vault, treasury, founder }: Props) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
           <div className="text-white font-semibold text-2xl tracking-tight">TOKEN DISTRIBUTION</div>
-          <div className="text-xs text-white/50 mt-1">Live On-Chain Allocation</div>
+          <div className="text-xs text-white/50 mt-1">Verified On-Chain Allocation</div>
         </div>
         <div
           style={{
@@ -44,13 +44,13 @@ export default function TokenDistribution({ vault, treasury, founder }: Props) {
             gap: 6,
           }}
         >
-          ● LIVE
+          ● VERIFIED
         </div>
       </div>
 
-      {/* Vault */}
+      {/* Reward Vault */}
       <DistributionLine
-        label="VAULT"
+        label="REWARD VAULT"
         value={`${vault.toLocaleString()} DMD`}
         percent={`${vaultPct.toFixed(1)}%`}
         width={vaultPct}
@@ -58,14 +58,14 @@ export default function TokenDistribution({ vault, treasury, founder }: Props) {
         sub="Liquidity + Rewards"
       />
 
-      {/* Founder */}
+      {/* Strategic Reserve */}
       <DistributionLine
-        label="FOUNDER"
+        label="STRATEGIC RESERVE"
         value={`${founder.toLocaleString()} DMD`}
         percent={`${founderPct.toFixed(1)}%`}
         width={founderPct}
         color="#f5c542"
-        sub="Team & Development"
+        sub="Protocol Growth + Development"
       />
 
       {/* Divider */}
@@ -75,19 +75,19 @@ export default function TokenDistribution({ vault, treasury, founder }: Props) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <div className="text-white/90 font-medium">TREASURY</div>
-          <div className="text-xs text-white/50">Reserve (SOL)</div>
+          <div className="text-xs text-white/50">Backing (SOL)</div>
         </div>
         <div className="text-right">
           <div className="text-2xl font-semibold text-white tracking-tighter">
             {treasury.toFixed(2)} <span className="text-sm text-white/60">SOL</span>
           </div>
-          <div className="text-xs text-white/50 mt-1">Separate on-chain reserve</div>
+          <div className="text-xs text-white/50 mt-1">Protected on-chain reserve</div>
         </div>
       </div>
 
       {/* Footer Hinweis */}
       <div className="text-[10px] text-white/40 mt-8 text-center">
-        100% on-chain • Keine versteckten Allokationen • Transparenz first
+        100% On-Chain • No Hidden Allocation • Transparency First
       </div>
     </div>
   );

@@ -8,9 +8,9 @@ export const translations = {
     forum: "Forum",
     leaderboard: "Leaderboard",
     airdrop: "Airdrop",
-    walletConnect: "Wallet verbinden",
+    walletConnect: "Investor Access",
     walletConnectHint:
-      "Verbinde deine Wallet über den Button unten, um DMD sicher zu nutzen.",
+      "Verbinde deine Wallet für sicheren Investor-Zugang zum DMD-Protokoll.",
     status: "Status",
     hint: "Hinweis",
     protocolNotice: "Protocol Notice",
@@ -28,10 +28,10 @@ export const translations = {
     pricingMode: "Pricing Mode",
     program: "Programm",
     mint: "Mint",
-    dmdPriceDex: "DMD Preis (DEX)",
-    dmdAppValue: "DMD App Wert",
+    dmdPriceDex: "Market Status",
+    dmdAppValue: "DMD Strategic Value",
     solPriceUsd: "SOL Preis (USD)",
-    live: "LIVE",
+    live: "VERIFIED",
     blocked: "BLOCKED",
     unknown: "UNKNOWN",
     dynamic: "Dynamisch",
@@ -42,8 +42,8 @@ export const translations = {
     // Trading
     walletOverview: "Wallet Übersicht",
     yourDmd: "Dein DMD",
-    dmdMarketDex: "DMD Market (DEX)",
-    yourDmdDexValue: "Wert deiner DMD (DEX)",
+    dmdMarketDex: "DMD Market Status",
+    yourDmdDexValue: "DMD Strategic Value",
     claimCounter: "Claim Counter",
     buyCountToday: "Käufe heute",
     buyCooldown: "Buy Cooldown",
@@ -51,17 +51,18 @@ export const translations = {
     freeSellsInWindow: "Freie Sells im Fenster",
     extraSellApprovals: "Extra Sell Freigaben",
     sellWindowReset: "Sell Window Reset",
-    treasurySol: "Treasury (SOL)",
-    vaultDmd: "Vault (DMD)",
+    treasurySol: "Treasury Backing (SOL)",
+    vaultDmd: "Reward Vault (DMD)",
     sellRoute: "Sell Route",
     free: "frei",
     resetUtc: "Reset täglich um 00:00 UTC",
 
     tradingNotice: "Trading Hinweis",
     sellOnchainLive: "Sell / DMD→SOL ist on-chain freigegeben.",
-    sellOnchainBlocked: "Sell / DMD→SOL ist on-chain aktuell blockiert.",
+    sellOnchainBlocked:
+      "Controlled Treasury Phase aktiv. Öffentliche DEX-Liquidität wird strategisch vorbereitet.",
     investorClientNotice:
-      "Die Investor App zeigt den echten On-chain-Status an. Der öffentliche Sell-Pfad wird im Investor-Client derzeit bewusst nicht direkt ausgeführt. Buy und Claim bleiben der sichere Standardpfad.",
+      "DMD befindet sich bewusst in der kontrollierten Treasury-Phase. Buy und Claim bleiben der sichere Standardpfad; öffentliche DEX-Liquidität wird erst nach strategischer Aktivierung geöffnet.",
 
     whitelist: "Whitelist",
     notApprovedYet: "Du bist noch nicht freigeschaltet.",
@@ -84,7 +85,8 @@ export const translations = {
     sellCurrentlyBlocked: "DMD → SOL AKTUELL BLOCKIERT",
     sellStatusLive: "DMD → SOL STATUS LIVE",
     sellOnchainEnabled: "Sell ist on-chain freigegeben.",
-    sellOnchainStillBlocked: "Sell bleibt on-chain aktuell blockiert.",
+    sellOnchainStillBlocked:
+      "Controlled Treasury Phase aktiv. Öffentliche DEX-Liquidität wird strategisch vorbereitet.",
     claimRemainsAvailable:
       "Claim bleibt verfügbar, sobald die Bedingungen erfüllt sind.",
     claimNotAvailableTitle: "Noch nicht verfügbar",
@@ -96,7 +98,7 @@ export const translations = {
       "Legacy-Wallet erkannt: BuyerState vorhanden, BuyerStateExtV2 fehlt noch.",
     conservativeDisplayNotice:
       "Die Anzeige basiert konservativ auf On-chain BuyerState, BuyerStateExtV2 und VaultConfigV2. Maßgeblich bleibt die Blockchain.",
-    onchainLive: "ON-CHAIN LIVE",
+    onchainLive: "ON-CHAIN VERIFIED",
     onchainBlocked: "ON-CHAIN BLOCKED",
 
     buyCountLegendZero: "0 Buys",
@@ -129,8 +131,7 @@ export const translations = {
     whitelistSent: "Whitelist gesendet:",
     buySent: "Buy gesendet:",
     claimSent: "Claim gesendet:",
-    v2StatusInitialized:
-      "V2-Status initialisiert:",
+    v2StatusInitialized: "V2-Status initialisiert:",
     v2StatusInitializedSuffix:
       "Bitte danach Claim / Trading erneut nutzen.",
     v2StatusInitializedClaimRetry:
@@ -148,11 +149,12 @@ export const translations = {
     legacyWalletClaimInitFirst:
       "Legacy-Wallet erkannt. Initialisiere zuerst BuyerStateExtV2…",
     claimUnavailablePrefix: "Claim nicht verfügbar - ",
-    sellFoundationPhaseBlocked: "Kein Sell Möglich Fundament findungphase",
+    sellFoundationPhaseBlocked:
+      "Kein Sell möglich während der kontrollierten Treasury-Phase.",
 
     // Sell flow explanation
     sellPublicClientNotice:
-      "Sell ist on-chain freigegeben. Der Public-Investor-Client führt den DMD→SOL-Pfad aktuell bewusst nicht selbst aus, weil die bestehende On-chain-Sell-Route treasury-seitig signergebunden ist. Die App zeigt dir den echten Sell-Status, aber täuscht keinen öffentlichen Sell-Flow vor.",
+      "DMD befindet sich bewusst in der kontrollierten Treasury-Phase. Der Public-Investor-Client führt den DMD→SOL-Pfad aktuell nicht direkt aus, weil die bestehende On-chain-Sell-Route treasury-seitig signergebunden ist. Die App zeigt den echten Status, täuscht aber keinen öffentlichen DEX-Sell-Flow vor.",
 
     // Error prefixes
     whitelistErrorPrefix: "Whitelist Fehler: ",
@@ -162,14 +164,16 @@ export const translations = {
     v2InitErrorPrefix: "V2 Init Fehler: ",
 
     // Normalized runtime errors
-    sellDisabledFrontend: "Sell / DMD→SOL ist aktuell bewusst deaktiviert.",
+    sellDisabledFrontend:
+      "DMD→SOL ist aktuell bewusst im öffentlichen Investor-Frontend deaktiviert.",
     buyCooldownActive:
       "Buy-Cooldown aktiv. Bitte warte, bis der Cooldown abgelaufen ist.",
     buyDailyLimitExceeded:
       "Tageslimit erreicht. Weitere Buys sind vorübergehend gesperrt.",
     legacyClaimFlowDisabled:
       "Nur Claim V2 ist aktiv. Bitte App-Stand prüfen.",
-    sellTemporarilyDisabled: "Sell ist on-chain derzeit deaktiviert.",
+    sellTemporarilyDisabled:
+      "Sell ist während der kontrollierten Treasury-Phase derzeit deaktiviert.",
     invalidTreasury:
       "Treasury-Konfiguration stimmt nicht mit der On-chain-Wahrheit überein.",
     invalidOwner:
@@ -195,9 +199,9 @@ export const translations = {
     forum: "Forum",
     leaderboard: "Leaderboard",
     airdrop: "Airdrop",
-    walletConnect: "Connect Wallet",
+    walletConnect: "Investor Access",
     walletConnectHint:
-      "Connect your wallet using the button below to use DMD securely.",
+      "Connect your wallet for secure investor access to the DMD protocol.",
     status: "Status",
     hint: "Notice",
     protocolNotice: "Protocol Notice",
@@ -215,10 +219,10 @@ export const translations = {
     pricingMode: "Pricing Mode",
     program: "Program",
     mint: "Mint",
-    dmdPriceDex: "DMD Price (DEX)",
-    dmdAppValue: "DMD App Value",
+    dmdPriceDex: "Market Status",
+    dmdAppValue: "DMD Strategic Value",
     solPriceUsd: "SOL Price (USD)",
-    live: "LIVE",
+    live: "VERIFIED",
     blocked: "BLOCKED",
     unknown: "UNKNOWN",
     dynamic: "Dynamic",
@@ -229,8 +233,8 @@ export const translations = {
     // Trading
     walletOverview: "Wallet Overview",
     yourDmd: "Your DMD",
-    dmdMarketDex: "DMD Market (DEX)",
-    yourDmdDexValue: "Value of your DMD (DEX)",
+    dmdMarketDex: "DMD Market Status",
+    yourDmdDexValue: "DMD Strategic Value",
     claimCounter: "Claim Counter",
     buyCountToday: "Buys Today",
     buyCooldown: "Buy Cooldown",
@@ -238,17 +242,18 @@ export const translations = {
     freeSellsInWindow: "Free Sells In Window",
     extraSellApprovals: "Extra Sell Approvals",
     sellWindowReset: "Sell Window Reset",
-    treasurySol: "Treasury (SOL)",
-    vaultDmd: "Vault (DMD)",
+    treasurySol: "Treasury Backing (SOL)",
+    vaultDmd: "Reward Vault (DMD)",
     sellRoute: "Sell Route",
     free: "free",
     resetUtc: "Resets daily at 00:00 UTC",
 
     tradingNotice: "Trading Notice",
     sellOnchainLive: "Sell / DMD→SOL is enabled on-chain.",
-    sellOnchainBlocked: "Sell / DMD→SOL is currently blocked on-chain.",
+    sellOnchainBlocked:
+      "Controlled Treasury Phase active. Public DEX liquidity is being prepared strategically.",
     investorClientNotice:
-      "The Investor App shows the real on-chain status. The public sell path is intentionally not executed directly in the investor client at this time. Buy and claim remain the safe standard path.",
+      "DMD is intentionally operating in a controlled treasury phase. Buy and claim remain the secure standard path; public DEX liquidity opens only after strategic activation.",
 
     whitelist: "Whitelist",
     notApprovedYet: "Your wallet is not approved yet.",
@@ -271,7 +276,8 @@ export const translations = {
     sellCurrentlyBlocked: "DMD → SOL CURRENTLY BLOCKED",
     sellStatusLive: "DMD → SOL STATUS LIVE",
     sellOnchainEnabled: "Sell is enabled on-chain.",
-    sellOnchainStillBlocked: "Sell remains blocked on-chain.",
+    sellOnchainStillBlocked:
+      "Controlled Treasury Phase active. Public DEX liquidity is being prepared strategically.",
     claimRemainsAvailable:
       "Claim remains available once the conditions are met.",
     claimNotAvailableTitle: "Not available yet",
@@ -283,7 +289,7 @@ export const translations = {
       "Legacy wallet detected: BuyerState exists, BuyerStateExtV2 is still missing.",
     conservativeDisplayNotice:
       "This display is based conservatively on on-chain BuyerState, BuyerStateExtV2 and VaultConfigV2. The blockchain remains authoritative.",
-    onchainLive: "ON-CHAIN LIVE",
+    onchainLive: "ON-CHAIN VERIFIED",
     onchainBlocked: "ON-CHAIN BLOCKED",
 
     buyCountLegendZero: "0 Buys",
@@ -335,11 +341,11 @@ export const translations = {
       "Legacy wallet detected. Initializing BuyerStateExtV2 first…",
     claimUnavailablePrefix: "Claim not available - ",
     sellFoundationPhaseBlocked:
-      "Sell is not available yet during the foundation phase.",
+      "Sell is not available yet during the controlled treasury phase.",
 
     // Sell flow explanation
     sellPublicClientNotice:
-      "Sell is enabled on-chain. The public investor client intentionally does not execute the DMD→SOL path directly at the moment because the current on-chain sell route is treasury-signer bound. The app shows the real sell status, but does not pretend to offer a public sell flow.",
+      "DMD is intentionally operating in a controlled treasury phase. The public investor client does not execute the DMD→SOL path directly at the moment because the current on-chain sell route is treasury-signer bound. The app shows the real status, but does not pretend to offer a public DEX sell flow.",
 
     // Error prefixes
     whitelistErrorPrefix: "Whitelist error: ",
@@ -350,14 +356,15 @@ export const translations = {
 
     // Normalized runtime errors
     sellDisabledFrontend:
-      "Sell / DMD→SOL is currently intentionally disabled in the frontend.",
+      "DMD→SOL is currently intentionally disabled in the public investor frontend.",
     buyCooldownActive:
       "Buy cooldown is active. Please wait until the cooldown has expired.",
     buyDailyLimitExceeded:
       "Daily limit reached. Additional buys are temporarily blocked.",
     legacyClaimFlowDisabled:
       "Only Claim V2 is active. Please verify the app version.",
-    sellTemporarilyDisabled: "Sell is currently disabled on-chain.",
+    sellTemporarilyDisabled:
+      "Sell is currently disabled during the controlled treasury phase.",
     invalidTreasury:
       "Treasury configuration does not match the on-chain truth.",
     invalidOwner:
