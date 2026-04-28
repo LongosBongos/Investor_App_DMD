@@ -62,7 +62,7 @@ export const WalletButtons: React.FC = () => {
             {wallet?.adapter.name ?? "Wallet"} · {shortKey || "verbunden"}
           </span>
           <button className="wallet-elite-btn" onClick={disconnect}>
-            Disconnect
+            Disconnect Wallet
           </button>
         </div>
       ) : (
@@ -74,7 +74,7 @@ export const WalletButtons: React.FC = () => {
               disabled={connecting}
               onClick={() => handleClick(name)}
             >
-              {connecting ? "Connecting…" : `Connect ${name}`}
+              {connecting ? "Connecting…" : `${name} Investor Access`}
             </button>
           ))}
         </div>
